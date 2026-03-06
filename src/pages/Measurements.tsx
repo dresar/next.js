@@ -159,9 +159,9 @@ const Measurements = () => {
                           {m.probe_status ?? "unknown"}
                         </span>
                       </td>
-                      <td className="p-3 hidden md:table-cell text-xs font-mono">{m.battery_level == null ? "—" : `${m.battery_level.toFixed(1)}%`}</td>
+                      <td className="p-3 hidden md:table-cell text-xs font-mono">{m.battery_level == null ? "—" : `${Number(m.battery_level).toFixed(1)}%`}</td>
                       <td className="p-3"><StatusBadge status={m.quality_status} color={statusToColor(m.quality_status)} /></td>
-                      <td className="p-3 text-xs text-muted-foreground hidden md:table-cell">{m.latitude?.toFixed(4)}, {m.longitude?.toFixed(4)}</td>
+                      <td className="p-3 text-xs text-muted-foreground hidden md:table-cell">{m.latitude != null ? Number(m.latitude).toFixed(4) : "—"}, {m.longitude != null ? Number(m.longitude).toFixed(4) : "—"}</td>
                       <td className="p-3 text-xs text-muted-foreground hidden sm:table-cell">{new Date(m.created_at).toLocaleString("id-ID")}</td>
                     </tr>
                   ))}

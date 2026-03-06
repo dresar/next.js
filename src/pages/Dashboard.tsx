@@ -99,9 +99,9 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
           <SensorCard title="Suhu" value={latestTemp} unit="°C" icon={Thermometer} variant="primary" subtitle="Realtime dari ESP32" />
           <SensorCard title="Nilai TDS" value={latestTds} unit="ppm" icon={Waves} variant={latestTds <= 300 || latestTds >= 800 ? "warning" : "success"} subtitle="Total Dissolved Solids" />
-          <SensorCard title="Tegangan Probe" value={latestVoltage == null ? "—" : latestVoltage.toFixed(2)} unit="V" icon={Activity} variant="primary" subtitle="Voltage probe" />
-          <SensorCard title="Status Probe" value={latestProbe === "liquid_detected" ? "Liquid" : latestProbe === "probe_dry" ? "Dry" : "Unknown"} unit="" icon={Droplets} variant={latestProbe === "liquid_detected" ? "success" : "primary"} subtitle={latestProbe === "liquid_detected" ? "Liquid detected" : "Probe dry"} />
-          <SensorCard title="Battery Device" value={latestBattery == null ? "—" : latestBattery.toFixed(1)} unit="%" icon={Battery} variant={latestBattery != null && latestBattery < 25 ? "danger" : "primary"} subtitle={latest?.device_id ? `Device: ${latest.device_id}` : "Device: —"} />
+          <SensorCard title="Tegangan Probe" value={latestVoltage == null ? "—" : Number(latestVoltage).toFixed(2)} unit="V" icon={Activity} variant="primary" subtitle="Voltage probe" />
+          <SensorCard title="Status Probe" value={latestProbe === "liquid_detected" ? "Liquid" : latestProbe === "probe_dry" ? "Dry" : "Unknown"} unit="" icon={Droplets} variant={latestProbe === "liquid_detected" ? "success" : latestProbe === "probe_dry" ? "danger" : "warning"} subtitle={latestProbe === "liquid_detected" ? "Liquid detected" : latestProbe === "probe_dry" ? "Probe belum dicelupkan" : "Unknown"} />
+          <SensorCard title="Battery Device" value={latestBattery == null ? "—" : Number(latestBattery).toFixed(1)} unit="%" icon={Battery} variant={latestBattery != null && Number(latestBattery) < 25 ? "danger" : "primary"} subtitle={latest?.device_id ? `Device: ${latest.device_id}` : "Device: —"} />
           <SensorCard title="Mutu Lateks" value={latestQuality.split(" ")[0]} unit="" icon={ShieldCheck} variant={latestQualityColor} subtitle={latestQuality} />
         </div>
 

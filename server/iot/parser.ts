@@ -1,13 +1,16 @@
 import { z } from "zod";
 
+// ESP32 payload: { temp, tds, volt, battery, status } + optional fields
 export const iotDataSchema = z.object({
   device_id: z.string().min(1).optional(),
   deviceId: z.string().min(1).optional(),
   owner_name: z.string().min(1).optional(),
   ownerName: z.string().min(1).optional(),
-  temperature: z.number(),
+  temperature: z.number().optional(),
+  temp: z.number().optional(),
   tds: z.number(),
   voltage: z.number().optional(),
+  volt: z.number().optional(),
   battery: z.number().optional(),
   status: z.string().optional(),
   timestamp: z.union([z.string(), z.number()]).optional(),
@@ -15,7 +18,11 @@ export const iotDataSchema = z.object({
   longitude: z.number().optional(),
   firmware_version: z.string().optional(),
   firmware: z.string().optional(),
-});
+}).transform((p) => ({
+  ...p,
+  temperature: p.temperature ?? p.temp ?? 0,
+  voltage: p.voltage ?? p.volt,
+}));
 
 export const iotStatusSchema = z.object({
   device_id: z.string().min(1).optional(),

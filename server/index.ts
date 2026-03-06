@@ -482,6 +482,32 @@ app.post("/api/measurements", requireAuth, async (req: AuthedRequest, res) => {
   return res.json(inserted.rows[0]);
 });
 
+app.patch("/api/measurements/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const auth = req.auth!;
+  const id = req.params.id;
+  const bodySchema = z.object({
+    owner_name: z.string().trim().min(1).max(200),
+    latitude: z.number().nullable().optional(),
+    longitude: z.number().nullable().optional(),
+  });
+  const body = bodySchema.safeParse(req.body);
+  if (!body.success) return res.status(400).json({ error: "Invalid body" });
+
+  const updated = await pool.query(
+    `
+    UPDATE public.latex_measurements
+    SET owner_name = $1, latitude = $2, longitude = $3
+    WHERE id = $4
+    RETURNING id, owner_name, latitude::float8 as latitude, longitude::float8 as longitude, tds_value, temperature::float8 as temperature, quality_status, created_at
+    `,
+    [body.data.owner_name, body.data.latitude ?? null, body.data.longitude ?? null, id]
+  );
+  if (updated.rowCount === 0) return res.status(404).json({ error: "Measurement not found" });
+  const row = updated.rows[0] as any;
+  broadcastJson({ type: "measurement:updated", data: row });
+  return res.json(row);
+});
+
 app.get("/api/devices", requireAuth, async (_req: AuthedRequest, res) => {
   const rows = await pool.query(
     `

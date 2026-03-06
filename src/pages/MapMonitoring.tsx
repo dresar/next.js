@@ -107,7 +107,7 @@ const MapMonitoring = () => {
                 <div>
                   <p className="font-medium text-sm">{d.owner_name}</p>
                   <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                    <MapPin className="h-3 w-3" />{d.latitude?.toFixed(4)}, {d.longitude?.toFixed(4)}
+                    <MapPin className="h-3 w-3" />{d.latitude != null ? Number(d.latitude).toFixed(4) : "—"}, {d.longitude != null ? Number(d.longitude).toFixed(4) : "—"}
                   </p>
                 </div>
                 <StatusBadge status={d.quality_status} color={statusToColor(d.quality_status)} />

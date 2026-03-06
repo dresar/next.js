@@ -17,15 +17,13 @@ import {
 
 const menuItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Pengukuran", url: "/measurements", icon: FlaskConical },
-  { title: "Device Monitoring", url: "/devices", icon: Cpu },
-  { title: "Data Logger", url: "/data-logger", icon: ScrollText },
-  { title: "OTA Monitor", url: "/ota", icon: DownloadCloud },
+  { title: "Monitoring Sensor", url: "/sensors", icon: FlaskConical },
   { title: "Peta Monitoring", url: "/map", icon: Map },
+  { title: "Riwayat Data", url: "/measurements", icon: BarChart3 },
+  { title: "Device Status", url: "/devices", icon: Cpu },
   { title: "AI Assistant", url: "/ai-assistant", icon: Bot },
-  { title: "Analitik Data", url: "/analytics", icon: BarChart3 },
-  { title: "Profil", url: "/profile", icon: UserCircle },
-  { title: "Pengaturan", url: "/settings", icon: Settings },
+  { title: "Profil Pengguna", url: "/profile", icon: UserCircle },
+  { title: "Pengaturan Sistem", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {

@@ -11,7 +11,7 @@ function batteryIcon(level: number | null) {
 
 function batteryLabel(level: number | null) {
   if (level == null) return "—";
-  return `${level.toFixed(1)}%`;
+  return `${Number(level).toFixed(1)}%`;
 }
 
 export default function DeviceMonitoring() {
