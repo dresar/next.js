@@ -23,10 +23,10 @@ export function classifyLatexQuality(params: { ph?: number | null; tds: number }
 export type ProbeStatus = "liquid_detected" | "probe_dry" | "unknown";
 
 export function probeStatusFromDeviceStatus(deviceStatus: string | null | undefined): ProbeStatus {
-  const s = (deviceStatus ?? "").toLowerCase();
+  const s = (deviceStatus ?? "").trim().toLowerCase();
   if (!s) return "unknown";
-  if (s.includes("probe_dry")) return "probe_dry";
-  if (s.includes("liquid")) return "liquid_detected";
+  if (s === "probe_dry" || s.includes("probe_dry")) return "probe_dry";
+  if (s === "liquid_detected" || s.includes("liquid")) return "liquid_detected";
   return "unknown";
 }
 

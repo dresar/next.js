@@ -27,6 +27,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     const err: ApiError = { message: msg, status: res.status };
     throw err;
   }
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 

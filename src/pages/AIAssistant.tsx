@@ -3,15 +3,18 @@ import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Send, Bot, User, Loader2 } from "lucide-react";
+import { sendAiChat, type ChatMessage } from "@/lib/ai-chat";
 
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-}
+const LATEX_SYSTEM_PROMPT =
+  "Kamu adalah ahli kualitas lateks karet dan IoT monitoring. Jawab dalam Bahasa Indonesia dengan jelas dan ringkas. Berikan interpretasi data sensor pH, TDS, dan suhu terkait kualitas lateks.";
 
 const AIAssistant = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: "Halo! Saya AI Assistant untuk monitoring kualitas lateks. Anda bisa bertanya tentang interpretasi data sensor, kualitas lateks, atau hal lain terkait IoT monitoring. Silakan bertanya!" },
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      role: "assistant",
+      content:
+        "Halo! Saya AI Assistant untuk monitoring kualitas lateks. Anda bisa bertanya tentang interpretasi data sensor, kualitas lateks, atau hal lain terkait IoT monitoring. Silakan bertanya!",
+    },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -23,30 +26,12 @@ const AIAssistant = () => {
 
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
-    const userMsg: Message = { role: "user", content: input.trim() };
+    const userMsg: ChatMessage = { role: "user", content: input.trim() };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
-
     try {
-      const res = await fetch("https://one.apprentice.cyou/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer ok_LVcqtjxR6TplFpDXOgQBk7jhydGf4NaU",
-        },
-        body: JSON.stringify({
-          model: "gemini-2.5-flash",
-          messages: [
-            { role: "system", content: "Kamu adalah ahli kualitas lateks karet dan IoT monitoring. Jawab dalam Bahasa Indonesia dengan jelas dan ringkas. Berikan interpretasi data sensor pH, TDS, dan suhu terkait kualitas lateks." },
-            ...messages.map((m) => ({ role: m.role, content: m.content })),
-            { role: "user", content: input.trim() },
-          ],
-        }),
-      });
-
-      const data = await res.json();
-      const reply = data.choices?.[0]?.message?.content || "Maaf, saya tidak dapat memproses permintaan Anda saat ini.";
+      const reply = await sendAiChat(LATEX_SYSTEM_PROMPT, messages, userMsg.content);
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
     } catch {
       setMessages((prev) => [...prev, { role: "assistant", content: "Terjadi kesalahan koneksi. Silakan coba lagi." }]);

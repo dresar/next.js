@@ -31,6 +31,8 @@ export function attachWebsocketServer(server: import("node:http").Server) {
   });
 }
 
+export type BroadcastFn = (msg: unknown) => void;
+
 export function broadcastJson(msg: unknown) {
   if (!wss) return;
   const data = JSON.stringify(msg);

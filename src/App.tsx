@@ -7,7 +7,6 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import Measurements from "./pages/Measurements";
-import MapMonitoring from "./pages/MapMonitoring";
 import AIAssistant from "./pages/AIAssistant";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import Profile from "./pages/Profile";
@@ -17,6 +16,7 @@ import NotFound from "./pages/NotFound";
 import DeviceMonitoring from "./pages/DeviceMonitoring";
 import DataLogger from "./pages/DataLogger";
 import OtaMonitor from "./pages/OtaMonitor";
+import ProgramESP32 from "./pages/ProgramESP32";
 
 const queryClient = new QueryClient();
 
@@ -30,12 +30,11 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/sensors" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/measurements" element={<ProtectedRoute><Measurements /></ProtectedRoute>} />
             <Route path="/devices" element={<ProtectedRoute><DeviceMonitoring /></ProtectedRoute>} />
             <Route path="/data-logger" element={<ProtectedRoute><DataLogger /></ProtectedRoute>} />
             <Route path="/ota" element={<ProtectedRoute><OtaMonitor /></ProtectedRoute>} />
-            <Route path="/map" element={<ProtectedRoute><MapMonitoring /></ProtectedRoute>} />
+            <Route path="/program-esp32" element={<ProtectedRoute><ProgramESP32 /></ProtectedRoute>} />
             <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
             <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

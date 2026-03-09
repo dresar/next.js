@@ -8,9 +8,9 @@ import { pool } from "./db/pool";
 import { signAccessToken } from "./auth/jwt";
 import { requireAuth, type AuthedRequest } from "./middleware/auth";
 import { createMqttClient } from "./iot/mqtt";
-import { getDeviceId, iotDataSchema, iotStatusSchema, normalizeTimestamp } from "./iot/parser";
 import { classifyLatexQuality, probeStatusFromDeviceStatus } from "./iot/classify";
 import { attachWebsocketServer, broadcastJson } from "./realtime/ws";
+import { createMqttDataHandler } from "./services/mqtt-handler";
 
 const envSchema = z.object({
   PORT: z.coerce.number().optional().default(3001),
@@ -30,140 +30,11 @@ app.use(
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
-// --- IoT ingest (MQTT) ---
+// --- IoT ingest (MQTT) — modular handler with logging ---
+const handleMqtt = createMqttDataHandler(broadcastJson);
 createMqttClient(async ({ topic, payload, receivedAt }) => {
   try {
-    if (topic === "latex/iot/data") {
-      const parsed = iotDataSchema.safeParse(payload);
-      if (!parsed.success) return;
-      const p = parsed.data;
-      const deviceId = getDeviceId(p);
-      const createdAt = normalizeTimestamp(p.timestamp);
-      const ownerName = (p.owner_name ?? p.ownerName ?? "Unknown").toString();
-      const firmwareVersion = p.firmware_version ?? p.firmware ?? null;
-
-      const qualityStatus = classifyLatexQuality({ ph: null, tds: p.tds });
-      const deviceStatus = p.status ?? null;
-      const probeStatus = probeStatusFromDeviceStatus(deviceStatus);
-
-      const inserted = await pool.query(
-        `
-        INSERT INTO public.latex_measurements
-          (user_id, owner_name, ph_value, tds_value, temperature, quality_status, latitude, longitude,
-           device_id, voltage_probe, battery_level, device_status, probe_status, firmware_version, source, created_at)
-        VALUES
-          (NULL, $1, NULL, $2, $3, $4, $5, $6,
-           $7, $8, $9, $10, $11, $12, 'mqtt', $13)
-        RETURNING
-          id,
-          device_id,
-          owner_name,
-          tds_value,
-          temperature,
-          voltage_probe,
-          battery_level,
-          device_status,
-          probe_status,
-          quality_status,
-          latitude,
-          longitude,
-          firmware_version,
-          created_at
-        `,
-        [
-          ownerName,
-          Math.round(p.tds),
-          p.temperature,
-          qualityStatus,
-          p.latitude ?? null,
-          p.longitude ?? null,
-          deviceId,
-          p.voltage ?? null,
-          p.battery ?? null,
-          deviceStatus,
-          probeStatus,
-          firmwareVersion,
-          createdAt,
-        ]
-      );
-
-      const measurement = inserted.rows[0];
-
-      await pool.query(
-        `
-        INSERT INTO public.devices (id, mqtt_connected, wifi_connected, battery_level, firmware_version, last_seen, last_data_at, last_status, last_status_at)
-        VALUES ($1, true, NULL, $2, $3, $4, $4, $5, $4)
-        ON CONFLICT (id) DO UPDATE SET
-          mqtt_connected = EXCLUDED.mqtt_connected,
-          battery_level = COALESCE(EXCLUDED.battery_level, public.devices.battery_level),
-          firmware_version = COALESCE(EXCLUDED.firmware_version, public.devices.firmware_version),
-          last_seen = EXCLUDED.last_seen,
-          last_data_at = EXCLUDED.last_data_at,
-          last_status = COALESCE(EXCLUDED.last_status, public.devices.last_status),
-          last_status_at = EXCLUDED.last_status_at
-        `,
-        [deviceId, p.battery ?? null, firmwareVersion, receivedAt, deviceStatus]
-      );
-
-      await pool.query(
-        `
-        INSERT INTO public.device_logs (device_id, topic, payload, received_at, measurement_id)
-        VALUES ($1, $2, $3, $4, $5)
-        `,
-        [deviceId, topic, payload as any, receivedAt, measurement.id]
-      );
-
-      broadcastJson({ type: "measurement:new", data: measurement });
-
-      if (deviceStatus && ["temp_error", "probe_dry", "sensor_disconnected"].some((x) => deviceStatus.includes(x))) {
-        broadcastJson({ type: "device:warning", data: { device_id: deviceId, status: deviceStatus, at: receivedAt.toISOString() } });
-      }
-    } else if (topic === "latex/iot/status") {
-      const parsed = iotStatusSchema.safeParse(payload);
-      if (!parsed.success) return;
-      const p = parsed.data;
-      const deviceId = getDeviceId(p);
-      const at = normalizeTimestamp(p.timestamp);
-      const firmwareVersion = p.firmware_version ?? p.firmware ?? null;
-
-      const wifi = p.wifi_connected ?? p.wifi ?? null;
-      const mqttConnected = p.mqtt_connected ?? p.mqtt ?? null;
-      const deviceStatus = p.status ?? null;
-
-      await pool.query(
-        `
-        INSERT INTO public.devices (id, wifi_connected, mqtt_connected, battery_level, firmware_version, last_seen, last_status_at, last_status)
-        VALUES ($1, $2, $3, $4, $5, $6, $6, $7)
-        ON CONFLICT (id) DO UPDATE SET
-          wifi_connected = COALESCE(EXCLUDED.wifi_connected, public.devices.wifi_connected),
-          mqtt_connected = COALESCE(EXCLUDED.mqtt_connected, public.devices.mqtt_connected),
-          battery_level = COALESCE(EXCLUDED.battery_level, public.devices.battery_level),
-          firmware_version = COALESCE(EXCLUDED.firmware_version, public.devices.firmware_version),
-          last_seen = EXCLUDED.last_seen,
-          last_status_at = EXCLUDED.last_status_at,
-          last_status = COALESCE(EXCLUDED.last_status, public.devices.last_status)
-        `,
-        [deviceId, wifi, mqttConnected, p.battery ?? null, firmwareVersion, receivedAt, deviceStatus]
-      );
-
-      await pool.query(
-        `INSERT INTO public.device_logs (device_id, topic, payload, received_at) VALUES ($1, $2, $3, $4)`,
-        [deviceId, topic, payload as any, receivedAt]
-      );
-
-      broadcastJson({
-        type: "device:status",
-        data: {
-          device_id: deviceId,
-          wifi_connected: wifi,
-          mqtt_connected: mqttConnected,
-          battery_level: p.battery ?? null,
-          firmware_version: firmwareVersion,
-          status: deviceStatus,
-          at: at.toISOString(),
-        },
-      });
-    }
+    await handleMqtt(topic, payload, receivedAt);
   } catch (err) {
     console.error("[mqtt] handler error", err);
   }
@@ -506,6 +377,69 @@ app.patch("/api/measurements/:id", requireAuth, async (req: AuthedRequest, res) 
   const row = updated.rows[0] as any;
   broadcastJson({ type: "measurement:updated", data: row });
   return res.json(row);
+});
+
+app.delete("/api/measurements/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const id = req.params.id;
+  const deleted = await pool.query(
+    `DELETE FROM public.latex_measurements WHERE id = $1 RETURNING id`,
+    [id]
+  );
+  if (deleted.rowCount === 0) return res.status(404).json({ error: "Measurement not found" });
+  broadcastJson({ type: "measurement:deleted", data: { id } });
+  return res.status(204).send();
+});
+
+app.post("/api/measurements/bulk-delete", requireAuth, async (req: AuthedRequest, res) => {
+  const bodySchema = z.object({ ids: z.array(z.string().uuid()).min(1).max(500) });
+  const body = bodySchema.safeParse(req.body);
+  if (!body.success) return res.status(400).json({ error: "Invalid body" });
+  let deleted = 0;
+  for (const id of body.data.ids) {
+    const r = await pool.query(`DELETE FROM public.latex_measurements WHERE id = $1 RETURNING id`, [id]);
+    if (r.rowCount) {
+      deleted += 1;
+      broadcastJson({ type: "measurement:deleted", data: { id } });
+    }
+  }
+  broadcastJson({ type: "measurements:deleted", data: { deleted } });
+  return res.json({ deleted });
+});
+
+app.delete("/api/measurements", requireAuth, async (req: AuthedRequest, res) => {
+  const qSchema = z.object({
+    owner: z.string().optional(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+    quality_status: z.string().optional(),
+  });
+  const q = qSchema.safeParse(req.query);
+  const where: string[] = [];
+  const values: unknown[] = [];
+  if (q.success) {
+    if (q.data.owner) {
+      values.push(`%${q.data.owner}%`);
+      where.push(`owner_name ILIKE $${values.length}`);
+    }
+    if (q.data.quality_status) {
+      values.push(q.data.quality_status);
+      where.push(`quality_status = $${values.length}`);
+    }
+    if (q.data.from) {
+      values.push(new Date(q.data.from));
+      where.push(`created_at >= $${values.length}`);
+    }
+    if (q.data.to) {
+      values.push(new Date(q.data.to));
+      where.push(`created_at <= $${values.length}`);
+    }
+  }
+  const sql = where.length
+    ? `DELETE FROM public.latex_measurements WHERE ${where.join(" AND ")}`
+    : `DELETE FROM public.latex_measurements`;
+  const result = await pool.query(sql, values);
+  broadcastJson({ type: "measurements:deleted", data: { deleted: result.rowCount ?? 0 } });
+  return res.json({ deleted: result.rowCount ?? 0 });
 });
 
 app.get("/api/devices", requireAuth, async (_req: AuthedRequest, res) => {
