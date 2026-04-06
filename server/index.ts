@@ -363,13 +363,21 @@ app.patch("/api/measurements/:id", requireAuth, async (req: AuthedRequest, res) 
   });
   const body = bodySchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ error: "Invalid body" });
+  await pool.query(
+    `
+    INSERT INTO public.latex_owners (name)
+    VALUES ($1)
+    ON CONFLICT (name) DO NOTHING
+    `,
+    [body.data.owner_name]
+  );
 
   const updated = await pool.query(
     `
     UPDATE public.latex_measurements
     SET owner_name = $1, latitude = $2, longitude = $3
     WHERE id = $4
-    RETURNING id, owner_name, latitude::float8 as latitude, longitude::float8 as longitude, tds_value, temperature::float8 as temperature, quality_status, created_at
+    RETURNING id, owner_name, ph_value::float8 as ph_value, latitude::float8 as latitude, longitude::float8 as longitude, tds_value, temperature::float8 as temperature, quality_status, device_id, device_status, probe_status, firmware_version, source, created_at
     `,
     [body.data.owner_name, body.data.latitude ?? null, body.data.longitude ?? null, id]
   );
@@ -457,9 +465,61 @@ app.get("/api/devices", requireAuth, async (_req: AuthedRequest, res) => {
       last_status
     FROM public.devices
     ORDER BY last_seen DESC NULLS LAST
+    LIMIT 1
     `
   );
   return res.json({ offline_after_seconds: env.DEVICE_OFFLINE_SECONDS, devices: rows.rows });
+});
+
+app.get("/api/owners", requireAuth, async (_req: AuthedRequest, res) => {
+  const rows = await pool.query(
+    `
+    SELECT name
+    FROM public.latex_owners
+    ORDER BY name ASC
+    LIMIT 1000
+    `
+  );
+  return res.json(rows.rows.map((r) => r.name));
+});
+
+app.post("/api/owners", requireAuth, async (req: AuthedRequest, res) => {
+  const bodySchema = z.object({ name: z.string().trim().min(1).max(200) });
+  const body = bodySchema.safeParse(req.body);
+  if (!body.success) return res.status(400).json({ error: "Invalid body" });
+  const name = body.data.name;
+  await pool.query(
+    `
+    INSERT INTO public.latex_owners (name)
+    VALUES ($1)
+    ON CONFLICT (name) DO NOTHING
+    `,
+    [name]
+  );
+  return res.status(201).json({ name });
+});
+
+app.get("/api/owners/:name", requireAuth, async (req: AuthedRequest, res) => {
+  const name = String(req.params.name ?? "").trim();
+  if (!name) return res.status(400).json({ error: "Invalid name" });
+  const rows = await pool.query<{ measurement_count: number; last_seen: string | null }>(
+    `
+    SELECT
+      count(*)::int as measurement_count,
+      max(created_at)::text as last_seen
+    FROM public.latex_measurements
+    WHERE owner_name = $1
+    `,
+    [name]
+  );
+  return res.json({ name, measurement_count: rows.rows[0]?.measurement_count ?? 0, last_seen: rows.rows[0]?.last_seen ?? null });
+});
+
+app.delete("/api/owners/:name", requireAuth, async (req: AuthedRequest, res) => {
+  const name = String(req.params.name ?? "").trim();
+  if (!name) return res.status(400).json({ error: "Invalid name" });
+  await pool.query(`DELETE FROM public.latex_owners WHERE name = $1`, [name]);
+  return res.status(204).send();
 });
 
 app.get("/api/device-logs", requireAuth, async (req: AuthedRequest, res) => {

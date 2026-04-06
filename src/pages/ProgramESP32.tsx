@@ -14,7 +14,7 @@ import {
 const STORAGE_KEY = "latex-esp32-firmware";
 
 const ESP32_SYSTEM_PROMPT = `Kamu adalah asisten ahli untuk firmware ESP32 dan sistem IoT Latex Monitor. Jawab dalam Bahasa Indonesia.
-Topik: Arduino/ESP32, sensor TDS/suhu, MQTT (broker.hivemq.com:1883, no auth, topic latex/iot/data dan latex/iot/status), debugging sensor, konfigurasi WiFi, dan kode C++.
+Topik: Arduino/ESP32, sensor TDS/suhu/pH (ADS1115 + DS18B20), MQTT (broker.hivemq.com:1883, no auth, topic latex/iot/data dan latex/iot/status), debugging sensor, konfigurasi WiFi, dan kode C++.
 Jika user minta mengubah, memperbaiki, atau menambah fitur pada kode firmware, berikan kode LENGKAP yang sudah dimodifikasi dalam satu blok markdown: \`\`\`cpp ... \`\`\` (tanpa penjelasan di dalam blok). User bisa klik "Terapkan ke editor" untuk memasukkan kode tersebut ke editor.`;
 
 function getStoredCode(): string {
@@ -256,10 +256,13 @@ export default function ProgramESP32() {
                 <strong className="text-foreground">MQTT Broker:</strong> broker.hivemq.com:1883 — <strong>tanpa auth</strong> (username/password kosong). Backend .env: <code className="bg-muted px-1 rounded">MQTT_URL=mqtt://broker.hivemq.com:1883</code>, <code className="bg-muted px-1 rounded">MQTT_USERNAME</code> dan <code className="bg-muted px-1 rounded">MQTT_PASSWORD</code> boleh kosong.
               </p>
               <p>
-                <strong className="text-foreground">Topic data:</strong> <code className="bg-muted px-1 rounded">latex/iot/data</code> — payload JSON: temp, tds, volt, battery, status (liquid_detected / probe_dry), timestamp.
+                <strong className="text-foreground">Topic data:</strong> <code className="bg-muted px-1 rounded">latex/iot/data</code> — payload JSON minimal: tds, temp, status (liquid_detected / probe_dry), timestamp. Firmware pH+TDS menambah ph dan mutu.
               </p>
               <p>
                 <strong className="text-foreground">Topic status:</strong> <code className="bg-muted px-1 rounded">latex/iot/status</code> — payload: mqtt_connected, wifi_connected, battery, status.
+              </p>
+              <p>
+                <strong className="text-foreground">Catatan payload (firmware versi pH+TDS):</strong> Dashboard/backend minimal butuh <code className="bg-muted px-1 rounded">tds</code> (angka). Firmware juga mengirim <code className="bg-muted px-1 rounded">ph</code>, <code className="bg-muted px-1 rounded">mutu</code>, <code className="bg-muted px-1 rounded">device_id</code>, dan <code className="bg-muted px-1 rounded">owner_name</code> untuk identitas.
               </p>
               <p>
                 Dashboard menerima data realtime via WebSocket setelah backend menerima dari MQTT. Pastikan backend jalan (<code className="bg-muted px-1 rounded">npm run dev</code>) dan .env sudah benar.

@@ -102,28 +102,28 @@ const Dashboard = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-sm text-muted-foreground">Monitoring kualitas lateks secara realtime</p>
+            <h1 className="text-lg sm:text-xl font-bold text-foreground">Dashboard</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">Monitoring kualitas lateks secara realtime</p>
           </div>
           <div className="flex items-center gap-2">
             {latest?.device_id && deviceOnline === false && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-destructive bg-destructive/10 px-2.5 py-1.5 rounded-lg">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-destructive bg-destructive/10 px-2 py-1 rounded-lg">
                 <WifiOff className="h-3.5 w-3.5" /> Device Offline
               </span>
             )}
             {!fromMqtt && hasData && (
-              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">Data manual / seed. Untuk ESP32: kirim ke topic <code className="bg-muted px-1 rounded">latex/iot/data</code></span>
+              <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-muted-foreground">Data manual / seed. Untuk ESP32: kirim ke topic <code className="bg-muted px-1 rounded">latex/iot/data</code></span>
             )}
-            <Button onClick={() => setShowAddDialog(true)} size="sm" className="gap-1.5">
+            <Button onClick={() => setShowAddDialog(true)} size="sm" className="gap-1.5 text-xs h-8 px-3">
               <Plus className="h-4 w-4" /> Tambah Data
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
           <SensorCard
             title="Suhu"
             value={hasData ? latestTemp : PLACEHOLDER}
@@ -195,15 +195,15 @@ const Dashboard = () => {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className="rounded-xl border bg-card p-5"
+            className="rounded-xl border bg-card p-4"
           >
-            <h3 className="text-sm font-semibold text-card-foreground mb-4">Tren Suhu & TDS</h3>
+            <h3 className="text-xs font-semibold text-card-foreground mb-3">Tren Suhu & TDS</h3>
             {timeData.length === 0 ? (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">
+              <div className="h-[220px] flex items-center justify-center text-muted-foreground text-xs">
                 {loading ? <Loader2 className="h-8 w-8 animate-spin" /> : "Belum ada data historis"}
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={timeData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="time" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} interval="preserveStartEnd" />
@@ -221,15 +221,15 @@ const Dashboard = () => {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.05 }}
-            className="rounded-xl border bg-card p-5"
+            className="rounded-xl border bg-card p-4"
           >
-            <h3 className="text-sm font-semibold text-card-foreground mb-4">Tren Suhu</h3>
+            <h3 className="text-xs font-semibold text-card-foreground mb-3">Tren Suhu</h3>
             {timeData.length === 0 ? (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">
+              <div className="h-[220px] flex items-center justify-center text-muted-foreground text-xs">
                 {loading ? <Loader2 className="h-8 w-8 animate-spin" /> : "Belum ada data historis"}
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={220}>
                 <AreaChart data={timeData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="time" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} interval="preserveStartEnd" />
@@ -242,17 +242,17 @@ const Dashboard = () => {
           </motion.div>
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }} className="rounded-xl border bg-card p-5">
-          <h3 className="text-sm font-semibold text-card-foreground mb-4">Pengukuran Terbaru</h3>
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }} className="rounded-xl border bg-card p-4">
+          <h3 className="text-xs font-semibold text-card-foreground mb-3">Pengukuran Terbaru</h3>
           {loading ? (
-            <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground text-sm">
+            <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground text-xs">
               <Loader2 className="h-4 w-4 animate-spin" /> Memuat data...
             </div>
           ) : measurements.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground text-sm">Belum ada data. Klik &quot;Tambah Data&quot; atau tunggu data dari MQTT.</div>
+            <div className="text-center py-6 text-muted-foreground text-xs">Belum ada data. Klik &quot;Tambah Data&quot; atau tunggu data dari MQTT.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-border text-left">
                     <th className="pb-3 font-medium text-muted-foreground">Pemilik</th>
@@ -266,7 +266,7 @@ const Dashboard = () => {
                 <tbody>
                   {measurements.slice(0, 5).map((m) => (
                     <tr key={m.id} className="border-b border-border/50 last:border-0">
-                      <td className="py-3 font-medium text-card-foreground">{m.owner_name}</td>
+                      <td className="py-2 font-medium text-card-foreground">{m.owner_name}</td>
                       <td className="py-3 font-mono">{m.ph_value ?? "—"}</td>
                       <td className="py-3 font-mono">{m.tds_value}</td>
                       <td className="py-3 font-mono">{m.temperature}°C</td>

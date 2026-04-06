@@ -2,8 +2,11 @@ import "dotenv/config";
 import mqtt, { type MqttClient } from "mqtt";
 import { z } from "zod";
 
+const DEFAULT_MQTT_URL = "mqtt://broker.hivemq.com:1883";
+const DEFAULT_TOPICS = ["latex/iot/data", "latex/iot/status", "skripsi/eka/lateks"] as const;
+
 const envSchema = z.object({
-  MQTT_URL: z.string().min(1),
+  MQTT_URL: z.string().min(1).optional().default(DEFAULT_MQTT_URL),
   MQTT_USERNAME: z.string().optional(),
   MQTT_PASSWORD: z.string().optional(),
   MQTT_CLIENT_ID: z.string().min(1).optional().default("latexguard-dashboard"),
@@ -18,7 +21,7 @@ export type MqttMessage = {
 };
 
 export function createMqttClient(onMessage: (msg: MqttMessage) => void) {
-  const client: MqttClient = mqtt.connect(env.MQTT_URL, {
+  const client: MqttClient = mqtt.connect(DEFAULT_MQTT_URL, {
     username: env.MQTT_USERNAME || undefined,
     password: env.MQTT_PASSWORD || undefined,
     clientId: env.MQTT_CLIENT_ID,
@@ -29,9 +32,9 @@ export function createMqttClient(onMessage: (msg: MqttMessage) => void) {
 
   client.on("connect", () => {
     console.log("[mqtt] connected");
-    client.subscribe(["latex/iot/data", "latex/iot/status"], { qos: 0 }, (err) => {
+    client.subscribe([...DEFAULT_TOPICS], { qos: 0 }, (err) => {
       if (err) console.error("[mqtt] subscribe error", err);
-      else console.log("[mqtt] subscribed latex/iot/data + latex/iot/status");
+      else console.log("[mqtt] subscribed", DEFAULT_TOPICS.join(", "));
     });
   });
 

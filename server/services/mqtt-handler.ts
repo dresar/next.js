@@ -4,27 +4,52 @@ import { insertMeasurementFromMqtt, normalizeMeasurementRow, updateDeviceLastSee
 import { pool } from "../db/pool";
 import { broadcastJson } from "../realtime/ws";
 
+function mapMutuToQualityStatus(mutu: string | undefined | null) {
+  const s = String(mutu ?? "").trim().toLowerCase();
+  if (!s) return null;
+  if (s.includes("asam")) return "Mutu Rendah Asam";
+  if (s.includes("amonia")) return "Terawetkan Amonia";
+  if (s.includes("oplos")) return "Indikasi Oplos Air";
+  if (s.includes("kontaminasi")) return "Indikasi Kontaminasi";
+  if (s.includes("prima")) return "Mutu Prima";
+  return null;
+}
+
 export function createMqttDataHandler(broadcast: (msg: unknown) => void = broadcastJson) {
   return async (topic: string, payload: unknown, receivedAt: Date) => {
-    if (topic === "latex/iot/data") {
+    if (topic === "latex/iot/data" || topic === "skripsi/eka/lateks") {
       const parsed = iotDataSchema.safeParse(payload);
       if (!parsed.success) {
-        console.log("[mqtt] latex/iot/data parse failed:", parsed.error.message);
+        console.log("[mqtt] data parse failed:", parsed.error.message);
         return;
       }
       const p = parsed.data;
-      const deviceId = getDeviceId(p);
-      const createdAt = normalizeTimestamp(p.timestamp);
-      const ownerName = (p.owner_name ?? p.ownerName ?? "Unknown").toString();
+      const topicOwner = topic.startsWith("skripsi/") ? topic.split("/")[1] : undefined;
+      const ownerName = (p.owner_name ?? p.ownerName ?? topicOwner ?? "Unknown").toString();
+      const deviceId = getDeviceId(p, `esp32-${ownerName || "device"}`);
+      const createdAt = normalizeTimestamp(p.timestamp ?? receivedAt.getTime());
       const firmwareVersion = p.firmware_version ?? p.firmware ?? null;
-      const qualityStatus = classifyLatexQuality({ ph: null, tds: p.tds });
-      const deviceStatus = p.status ?? null;
+      const mappedQuality = mapMutuToQualityStatus(p.quality_status);
+      const qualityStatus = mappedQuality ?? classifyLatexQuality({ ph: p.ph ?? null, tds: p.tds });
+      const deviceStatus = p.status ?? (p.tds > 20 ? "liquid_detected" : "probe_dry");
       const probeStatus = probeStatusFromDeviceStatus(deviceStatus);
 
       console.log("[mqtt] data received:", { deviceId, temp: p.temperature, tds: p.tds, volt: p.voltage, battery: p.battery, status: deviceStatus, probe: probeStatus });
 
+      if (ownerName && ownerName !== "Unknown") {
+        await pool.query(
+          `
+          INSERT INTO public.latex_owners (name)
+          VALUES ($1)
+          ON CONFLICT (name) DO NOTHING
+          `,
+          [ownerName]
+        );
+      }
+
       const row = await insertMeasurementFromMqtt({
         owner_name: ownerName,
+        ph_value: p.ph ?? null,
         tds_value: Math.round(p.tds),
         temperature: p.temperature,
         quality_status: qualityStatus,
@@ -45,9 +70,14 @@ export function createMqttDataHandler(broadcast: (msg: unknown) => void = broadc
         last_status: deviceStatus,
       });
 
+      const logPayload =
+        typeof payload === "object" && payload != null
+          ? { ...((payload as Record<string, unknown>) ?? {}), device_id: deviceId, owner_name: ownerName, status: deviceStatus, timestamp: createdAt.toISOString() }
+          : { payload, device_id: deviceId, owner_name: ownerName, status: deviceStatus, timestamp: createdAt.toISOString() };
+
       await pool.query(
         `INSERT INTO public.device_logs (device_id, topic, payload, received_at, measurement_id) VALUES ($1, $2, $3, $4, $5)`,
-        [deviceId, topic, payload, receivedAt, row.id]
+        [deviceId, topic, logPayload, receivedAt, row.id]
       );
 
       const normalized = normalizeMeasurementRow(row);

@@ -24,33 +24,40 @@ const iconBg = {
   danger: "bg-destructive/10 text-destructive",
 };
 
-const isPlaceholder = (v: string | number) =>
-  typeof v === "string" && (v === "Menunggu Data Sensor" || v.length > 15);
+function isNumericLike(v: string | number) {
+  if (typeof v === "number") return true;
+  const s = v.trim();
+  if (!s) return false;
+  return /^-?\d+(\.\d+)?$/.test(s);
+}
+
+const isPlaceholder = (v: string | number) => typeof v === "string" && v === "Menunggu Data Sensor";
 
 export function SensorCard({ title, value, unit, icon: Icon, variant = "primary", subtitle }: SensorCardProps) {
   const showPlaceholder = isPlaceholder(value);
+  const showBig = !showPlaceholder && isNumericLike(value);
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className={`rounded-xl border bg-card p-5 min-h-[120px] flex flex-col ${variantStyles[variant]} transition-all hover:shadow-md`}
+      className={`rounded-xl border bg-card p-3 sm:p-4 min-h-[96px] flex flex-col ${variantStyles[variant]} transition-all hover:shadow-md`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
-          <div className="mt-2 flex flex-wrap items-baseline gap-1">
+          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
+          <div className="mt-1.5 flex flex-wrap items-baseline gap-1">
             <span
-              className={`font-bold font-mono text-card-foreground ${showPlaceholder ? "text-sm" : "text-2xl sm:text-3xl"}`}
+              className={`font-bold font-mono text-card-foreground ${showPlaceholder ? "text-xs" : showBig ? "text-lg sm:text-xl" : "text-sm sm:text-base"}`}
             >
               {value}
             </span>
-            {unit && <span className="text-sm text-muted-foreground">{unit}</span>}
+            {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
           </div>
-          {subtitle && <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{subtitle}</p>}
+          {subtitle && <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">{subtitle}</p>}
         </div>
-        <div className={`rounded-lg p-2.5 shrink-0 ${iconBg[variant]}`}>
-          <Icon className="h-5 w-5" />
+        <div className={`rounded-lg p-2 shrink-0 ${iconBg[variant]}`}>
+          <Icon className="h-4 w-4" />
         </div>
       </div>
     </motion.div>

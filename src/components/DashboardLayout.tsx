@@ -1,6 +1,5 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { MqttOwnerPopup } from "@/components/MqttOwnerPopup";
 import { Bell, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/use-theme";
@@ -30,21 +29,25 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
     const unsub = subscribeRealtime((evt) => {
       if (evt.type === "device:warning") {
-        const w = evt.data as any;
-        toast.warning(`Peringatan perangkat ${w.device_id}: ${w.status}`);
+        const w = evt.data as { device_id?: unknown; status?: unknown };
+        const deviceId = String(w.device_id ?? "").trim() || "unknown";
+        const status = String(w.status ?? "").trim() || "warning";
+        toast.warning(`Peringatan perangkat ${deviceId}: ${status}`);
       }
       if (evt.type === "device:status") {
-        const d = evt.data as any;
-        if (d.device_id) {
-          lastSeen.set(d.device_id, Date.now());
-          offlineNotified.delete(d.device_id);
+        const d = evt.data as { device_id?: unknown };
+        const deviceId = String(d.device_id ?? "").trim();
+        if (deviceId) {
+          lastSeen.set(deviceId, Date.now());
+          offlineNotified.delete(deviceId);
         }
       }
       if (evt.type === "measurement:new") {
-        const m = evt.data as any;
-        if (m.device_id) {
-          lastSeen.set(m.device_id, Date.now());
-          offlineNotified.delete(m.device_id);
+        const m = evt.data as { device_id?: unknown };
+        const deviceId = String(m.device_id ?? "").trim();
+        if (deviceId) {
+          lastSeen.set(deviceId, Date.now());
+          offlineNotified.delete(deviceId);
         }
       }
     });
@@ -67,7 +70,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <MqttOwnerPopup />
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">

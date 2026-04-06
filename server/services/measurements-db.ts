@@ -36,6 +36,7 @@ export function normalizeMeasurementRow(row: Record<string, unknown>): Record<st
 
 export async function insertMeasurementFromMqtt(params: {
   owner_name: string;
+  ph_value: number | null;
   tds_value: number;
   temperature: number;
   quality_status: string;
@@ -54,12 +55,13 @@ export async function insertMeasurementFromMqtt(params: {
     INSERT INTO public.latex_measurements
       (user_id, owner_name, ph_value, tds_value, temperature, quality_status, latitude, longitude,
        device_id, voltage_probe, battery_level, device_status, probe_status, firmware_version, source, created_at)
-    VALUES (NULL, $1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'mqtt', $13)
+    VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'mqtt', $14)
     RETURNING id, user_id, device_id, owner_name, ph_value::float8, tds_value, temperature::float8, quality_status,
       latitude::float8, longitude::float8, voltage_probe::float8, battery_level::float8, device_status, probe_status, firmware_version, source, created_at
     `,
     [
       params.owner_name,
+      params.ph_value,
       params.tds_value,
       params.temperature,
       params.quality_status,
