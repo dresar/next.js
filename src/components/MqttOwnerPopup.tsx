@@ -58,9 +58,34 @@ export function MqttOwnerPopup() {
     setModalEnabled((prev) => {
       const next = !prev;
       localStorage.setItem(MODAL_ENABLED_KEY, String(next));
-      if (!next) { setPending(null); hasActiveRef.current = false; }
+      if (!next && pending) {
+        saveAsUnknown(pending);
+        setPending(null);
+        hasActiveRef.current = false;
+        queueRef.current.forEach(saveAsUnknown);
+        queueRef.current = [];
+      }
       return next;
     });
+  };
+
+  const saveAsUnknown = async (data: RealtimeData) => {
+    try {
+      await apiFetch("/api/measurements", {
+        method: "POST",
+        body: JSON.stringify({
+          ownerName: "Unknown",
+          ph: data.ph_value,
+          tds: data.tds_value,
+          temperature: data.temperature,
+          latitude: null,
+          longitude: null,
+        }),
+      });
+      toast.info("Data diam-diam disimpan sebagai Unknown", { duration: 2000 });
+    } catch {
+      // slient fail
+    }
   };
 
   const showNext = () => {
@@ -75,8 +100,11 @@ export function MqttOwnerPopup() {
   };
 
   const addToQueue = (data: RealtimeData) => {
-    if (!modalEnabled) return;
     if (shouldSkip(data.quality_status)) return; // probe di udara, skip
+    if (!modalEnabled) {
+      saveAsUnknown(data);
+      return;
+    }
     if (hasActiveRef.current) {
       if (!queueRef.current.find((x) => x.created_at === data.created_at)) {
         queueRef.current.push(data);
@@ -152,6 +180,7 @@ export function MqttOwnerPopup() {
   };
 
   const handleSkip = () => {
+    if (pending) saveAsUnknown(pending);
     setPending(null);
     showNext();
   };

@@ -92,7 +92,7 @@ const Measurements = () => {
     params.set("limit", "1000");
 
     const data = await apiFetch<MeasurementRow[]>(`/api/measurements?${params.toString()}`);
-    setRows(data);
+    setRows(data.filter((m) => m.owner_name !== "Unknown"));
     setLoading(false);
   };
 

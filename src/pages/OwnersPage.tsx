@@ -65,7 +65,7 @@ export default function OwnersPage() {
     setLoadingOwners(true);
     try {
       const rows = await apiFetch<string[]>("/api/owners");
-      setOwners(rows);
+      setOwners(rows.filter(o => o && o.toLowerCase() !== "unknown"));
     } catch (err) {
       toast.error((err as { message?: string })?.message ?? "Gagal memuat daftar pemilik");
     } finally {

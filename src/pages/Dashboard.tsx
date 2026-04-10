@@ -213,19 +213,32 @@ const Dashboard = () => {
             <h3 className="text-xs font-semibold text-card-foreground mb-3">Tren pH &amp; TDS (Data Tersimpan)</h3>
             {timeData.length === 0 ? (
               <div className="h-[220px] flex items-center justify-center text-muted-foreground text-xs">
-{ "Belum ada data tersimpan"}
+                Belum ada data tersimpan
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={timeData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} interval="preserveStartEnd" />
-                  <YAxis yAxisId="ph" domain={[6, 10]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis yAxisId="tds" orientation="right" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--card-foreground))" }} />
-                  <Line yAxisId="ph" type="monotone" dataKey="ph" stroke="hsl(142, 76%, 46%)" strokeWidth={2} dot={false} name="pH" />
-                  <Line yAxisId="tds" type="monotone" dataKey="tds" stroke="hsl(200, 80%, 55%)" strokeWidth={2} dot={false} name="TDS (ppm)" />
-                </LineChart>
+                <AreaChart data={timeData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorPh" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(142, 76%, 46%)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(142, 76%, 46%)" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorTds" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(200, 80%, 55%)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(200, 80%, 55%)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
+                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} interval="preserveStartEnd" axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="ph" domain={[6, 10]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} dx={-10} />
+                  <YAxis yAxisId="tds" orientation="right" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} dx={10} />
+                  <Tooltip
+                    contentStyle={{ background: "rgba(10, 10, 10, 0.8)", backdropFilter: "blur(8px)", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12, color: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}
+                    itemStyle={{ color: "#e2e8f0", fontWeight: 500 }}
+                  />
+                  <Area yAxisId="ph" type="monotone" dataKey="ph" stroke="hsl(142, 76%, 46%)" strokeWidth={3} fillOpacity={1} fill="url(#colorPh)" activeDot={{ r: 6, strokeWidth: 0, fill: "hsl(142, 76%, 46%)" }} name="pH" />
+                  <Area yAxisId="tds" type="monotone" dataKey="tds" stroke="hsl(200, 80%, 55%)" strokeWidth={3} fillOpacity={1} fill="url(#colorTds)" activeDot={{ r: 6, strokeWidth: 0, fill: "hsl(200, 80%, 55%)" }} name="TDS (ppm)" />
+                </AreaChart>
               </ResponsiveContainer>
             )}
           </motion.div>
@@ -239,16 +252,25 @@ const Dashboard = () => {
             <h3 className="text-xs font-semibold text-card-foreground mb-3">Tren Suhu (°C)</h3>
             {timeData.length === 0 ? (
               <div className="h-[220px] flex items-center justify-center text-muted-foreground text-xs">
-{ "Belum ada data tersimpan"}
+                Belum ada data tersimpan
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={timeData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} interval="preserveStartEnd" />
-                  <YAxis domain={[24, 36]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--card-foreground))" }} />
-                  <Area type="monotone" dataKey="suhu" stroke="hsl(38, 92%, 50%)" fill="hsl(38 92% 50% / 0.1)" strokeWidth={2} name="Suhu (°C)" />
+                <AreaChart data={timeData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(38, 92%, 50%)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(38, 92%, 50%)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
+                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} interval="preserveStartEnd" axisLine={false} tickLine={false} />
+                  <YAxis domain={[24, 36]} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} dx={-10} />
+                  <Tooltip
+                    contentStyle={{ background: "rgba(10, 10, 10, 0.8)", backdropFilter: "blur(8px)", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12, color: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}
+                    itemStyle={{ color: "#e2e8f0", fontWeight: 500 }}
+                  />
+                  <Area type="monotone" dataKey="suhu" stroke="hsl(38, 92%, 50%)" fillOpacity={1} fill="url(#colorTemp)" strokeWidth={3} activeDot={{ r: 6, strokeWidth: 0, fill: "hsl(38, 92%, 50%)" }} name="Suhu (°C)" />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -281,7 +303,10 @@ const Dashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {measurements.slice(0, 5).map((m) => (
+                  {measurements
+                    .filter((m) => m.owner_name !== "Unknown")
+                    .slice(0, 5)
+                    .map((m) => (
                     <tr key={m.id} className="border-b border-border/40 last:border-0 hover:bg-muted/20 transition-colors">
                       <td className="py-2 font-medium">{m.owner_name}</td>
                       <td className="py-2 font-mono">{m.ph_value != null ? Number(m.ph_value).toFixed(2) : "—"}</td>
