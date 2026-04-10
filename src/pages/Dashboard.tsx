@@ -263,11 +263,7 @@ const Dashboard = () => {
           className="rounded-xl border bg-card p-4"
         >
           <h3 className="text-xs font-semibold text-card-foreground mb-3">Pengukuran Tersimpan (5 Terakhir)</h3>
-          {loading ? (
-            <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground text-xs">
-              <Loader2 className="h-4 w-4 animate-spin" /> Memuat...
-            </div>
-          ) : measurements.length === 0 ? (
+          {measurements.length === 0 ? (
             <div className="text-center py-6 text-muted-foreground text-xs">
               Belum ada data tersimpan. Data masuk ke database hanya saat klik &quot;Simpan&quot; di popup sensor.
             </div>
