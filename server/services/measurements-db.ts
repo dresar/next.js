@@ -1,4 +1,4 @@
-import { pool } from "../db/pool";
+import { pool } from "../db/pool.js";
 
 function toNum(v: unknown): number | null {
   if (v == null) return null;

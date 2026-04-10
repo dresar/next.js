@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { WebSocketServer, WebSocket } from "ws";
 import { z } from "zod";
-import { verifyAccessToken } from "../auth/jwt";
+import { verifyAccessToken } from "../auth/jwt.js";
 
 const envSchema = z.object({
   WS_PATH: z.string().optional().default("/api/ws"),

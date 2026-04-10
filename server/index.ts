@@ -4,13 +4,13 @@ import cors from "cors";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import http from "node:http";
-import { pool } from "./db/pool";
-import { signAccessToken } from "./auth/jwt";
-import { requireAuth, type AuthedRequest } from "./middleware/auth";
-import { createMqttClient } from "./iot/mqtt";
-import { classifyLatexQuality, probeStatusFromDeviceStatus } from "./iot/classify";
-import { attachWebsocketServer, broadcastJson } from "./realtime/ws";
-import { createMqttDataHandler } from "./services/mqtt-handler";
+import { pool } from "./db/pool.js";
+import { signAccessToken } from "./auth/jwt.js";
+import { requireAuth, type AuthedRequest } from "./middleware/auth.js";
+import { createMqttClient } from "./iot/mqtt.js";
+import { classifyLatexQuality, probeStatusFromDeviceStatus } from "./iot/classify.js";
+import { attachWebsocketServer, broadcastJson } from "./realtime/ws.js";
+import { createMqttDataHandler } from "./services/mqtt-handler.js";
 
 const envSchema = z.object({
   PORT: z.coerce.number().optional().default(3001),

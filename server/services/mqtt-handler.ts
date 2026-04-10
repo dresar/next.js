@@ -1,8 +1,8 @@
-import { getDeviceId, iotDataSchema, iotStatusSchema, normalizeTimestamp } from "../iot/parser";
-import { classifyLatexQuality, probeStatusFromMutu } from "../iot/classify";
-import { updateDeviceLastSeen } from "./measurements-db";
-import { pool } from "../db/pool";
-import { broadcastJson } from "../realtime/ws";
+import { getDeviceId, iotDataSchema, iotStatusSchema, normalizeTimestamp } from "../iot/parser.js";
+import { classifyLatexQuality, probeStatusFromMutu } from "../iot/classify.js";
+import { updateDeviceLastSeen } from "./measurements-db.js";
+import { pool } from "../db/pool.js";
+import { broadcastJson } from "../realtime/ws.js";
 
 /**
  * Pemetaan nilai mutu dari ESP32 ke label Indonesia standar.
