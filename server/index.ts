@@ -541,6 +541,14 @@ app.get("/api/device-logs", requireAuth, async (req: AuthedRequest, res) => {
   return res.json(rows.rows);
 });
 
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("Express Global Error:", err);
+  res.status(500).json({
+    error: "Internal Server Error",
+    detail: err?.message || String(err)
+  });
+});
+
 const server = http.createServer(app);
 
 // Jika berjalan secara lokal (bukan VERCEL), jalankan websocket & listener
