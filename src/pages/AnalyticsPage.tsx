@@ -44,9 +44,7 @@ const AnalyticsPage = () => {
           <p className="text-sm text-muted-foreground">Ringkasan statistik pengukuran kualitas lateks</p>
         </div>
 
-        {loading ? (
-          <div className="text-center py-8 text-muted-foreground">Memuat data...</div>
-        ) : (
+
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="rounded-xl border bg-card p-5 text-center">
@@ -94,7 +92,6 @@ const AnalyticsPage = () => {
               </div>
             </div>
           </>
-        )}
       </div>
     </DashboardLayout>
   );

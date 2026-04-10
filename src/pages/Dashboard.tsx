@@ -213,7 +213,7 @@ const Dashboard = () => {
             <h3 className="text-xs font-semibold text-card-foreground mb-3">Tren pH &amp; TDS (Data Tersimpan)</h3>
             {timeData.length === 0 ? (
               <div className="h-[220px] flex items-center justify-center text-muted-foreground text-xs">
-                {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : "Belum ada data tersimpan"}
+{ "Belum ada data tersimpan"}
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
@@ -239,7 +239,7 @@ const Dashboard = () => {
             <h3 className="text-xs font-semibold text-card-foreground mb-3">Tren Suhu (°C)</h3>
             {timeData.length === 0 ? (
               <div className="h-[220px] flex items-center justify-center text-muted-foreground text-xs">
-                {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : "Belum ada data tersimpan"}
+{ "Belum ada data tersimpan"}
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={220}>

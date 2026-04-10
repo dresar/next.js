@@ -42,9 +42,6 @@ export default function DeviceMonitoring() {
         )}
 
         <div className="rounded-xl border bg-card overflow-hidden">
-          {loading ? (
-            <div className="p-6 text-sm text-muted-foreground text-center">Memuat status perangkat...</div>
-          ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -109,7 +106,6 @@ export default function DeviceMonitoring() {
                 <div className="p-6 text-center text-muted-foreground text-sm">Belum ada perangkat.</div>
               )}
             </div>
-          )}
         </div>
       </div>
     </DashboardLayout>

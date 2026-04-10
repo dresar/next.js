@@ -356,11 +356,7 @@ const Measurements = () => {
         </div>
 
         <div className="rounded-xl border bg-card overflow-hidden">
-          {loading ? (
-            <div className="p-8 text-center text-muted-foreground text-sm flex items-center justify-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" /> Memuat data...
-            </div>
-          ) : (
+        <div className="rounded-xl border bg-card overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -448,7 +444,6 @@ const Measurements = () => {
                 </Button>
               </div>
             </div>
-          )}
         </div>
       </div>
 

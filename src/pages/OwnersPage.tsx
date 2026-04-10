@@ -225,9 +225,7 @@ export default function OwnersPage() {
             </div>
 
             <div className="p-2 max-h-[520px] overflow-auto">
-              {loadingOwners ? (
-                <div className="p-4 text-sm text-muted-foreground">Memuat...</div>
-              ) : pagedOwners.length === 0 ? (
+              {pagedOwners.length === 0 ? (
                 <div className="p-4 text-sm text-muted-foreground">Belum ada pemilik.</div>
               ) : (
                 <div className="space-y-1">
@@ -286,8 +284,6 @@ export default function OwnersPage() {
             <div className="p-4 space-y-4">
               {!selected ? (
                 <div className="text-sm text-muted-foreground">Pilih pemilik untuk melihat detail.</div>
-              ) : loadingData ? (
-                <div className="text-sm text-muted-foreground">Memuat data...</div>
               ) : (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

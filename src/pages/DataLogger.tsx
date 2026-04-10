@@ -74,9 +74,6 @@ export default function DataLogger() {
         </div>
 
         <div className="rounded-xl border bg-card overflow-hidden">
-          {loading ? (
-            <div className="p-6 text-center text-muted-foreground text-sm">Memuat log...</div>
-          ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -108,7 +105,6 @@ export default function DataLogger() {
                 </div>
               )}
             </div>
-          )}
         </div>
       </div>
     </DashboardLayout>

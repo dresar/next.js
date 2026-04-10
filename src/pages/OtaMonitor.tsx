@@ -14,9 +14,6 @@ export default function OtaMonitor() {
         </div>
 
         <div className="rounded-xl border bg-card overflow-hidden">
-          {loading ? (
-            <div className="p-6 text-center text-muted-foreground text-sm">Memuat data OTA...</div>
-          ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -53,7 +50,6 @@ export default function OtaMonitor() {
                 <div className="p-6 text-center text-muted-foreground text-sm">Belum ada perangkat.</div>
               )}
             </div>
-          )}
         </div>
       </div>
     </DashboardLayout>
