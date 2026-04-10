@@ -48,8 +48,9 @@ type MeasurementRow = {
 const PER_PAGE = 20;
 
 function statusToColor(status: string): StatusColor {
-  if (status === "Mutu Prima") return "success";
-  if (status === "Mutu Rendah Asam") return "danger";
+  const s = status.toLowerCase();
+  if (s.includes("prima")) return "success";
+  if (s.includes("asam") || s.includes("buruk") || s.includes("rendah")) return "danger";
   return "warning";
 }
 
@@ -343,11 +344,11 @@ const Measurements = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Semua Status</SelectItem>
-              <SelectItem value="Mutu Prima">Mutu Prima</SelectItem>
-              <SelectItem value="Mutu Rendah Asam">Mutu Rendah</SelectItem>
-              <SelectItem value="Terawetkan Amonia">Terawetkan</SelectItem>
-              <SelectItem value="Indikasi Oplos Air">Oplos Air</SelectItem>
-              <SelectItem value="Indikasi Kontaminasi">Kontaminasi</SelectItem>
+              <SelectItem value="Mutu Prima">Mutu Prima (OK)</SelectItem>
+              <SelectItem value="Mutu Rendah (Asam)">Mutu Rendah (Asam)</SelectItem>
+              <SelectItem value="Terawetkan Amonia">Terawetkan Amonia</SelectItem>
+              <SelectItem value="Indikasi Kontaminasi">Indikasi Kontaminasi</SelectItem>
+              <SelectItem value="Indikasi Oplos Air">Indikasi Oplos Air</SelectItem>
             </SelectContent>
           </Select>
           <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="w-full sm:w-[180px]" />
@@ -374,11 +375,9 @@ const Measurements = () => {
                     <th className="p-3 text-left font-medium text-muted-foreground">#</th>
                     <th className="p-3 text-left font-medium text-muted-foreground">Pemilik</th>
                     <th className="p-3 text-left font-medium text-muted-foreground">pH</th>
-                    <th className="p-3 text-left font-medium text-muted-foreground">TDS</th>
+                    <th className="p-3 text-left font-medium text-muted-foreground">TDS (ppm)</th>
                     <th className="p-3 text-left font-medium text-muted-foreground">Suhu</th>
-                    <th className="p-3 text-left font-medium text-muted-foreground hidden md:table-cell">Probe</th>
-                    <th className="p-3 text-left font-medium text-muted-foreground hidden md:table-cell">Battery</th>
-                    <th className="p-3 text-left font-medium text-muted-foreground">Status</th>
+                    <th className="p-3 text-left font-medium text-muted-foreground">Mutu</th>
                     <th className="p-3 text-left font-medium text-muted-foreground hidden md:table-cell">Lokasi</th>
                     <th className="p-3 text-left font-medium text-muted-foreground hidden sm:table-cell">Waktu</th>
                     <th className="p-3 text-left font-medium text-muted-foreground w-24">Aksi</th>
@@ -396,16 +395,9 @@ const Measurements = () => {
                       </td>
                       <td className="p-3 text-muted-foreground">{(currentPage - 1) * PER_PAGE + i + 1}</td>
                       <td className="p-3 font-medium">{m.owner_name}</td>
-                      <td className="p-3 font-mono">{m.ph_value ?? "—"}</td>
+                      <td className="p-3 font-mono">{m.ph_value != null ? Number(m.ph_value).toFixed(2) : "—"}</td>
                       <td className="p-3 font-mono">{m.tds_value}</td>
-                      <td className="p-3 font-mono">{m.temperature}°C</td>
-                      <td className="p-3 hidden md:table-cell text-xs">
-                        <span className={`inline-flex items-center gap-2 px-2 py-1 rounded-full ${m.probe_status === "liquid_detected" ? "bg-success/10 text-success" : m.probe_status === "probe_dry" ? "bg-muted text-muted-foreground" : "bg-muted/40 text-muted-foreground"}`}>
-                          <span className={`h-2 w-2 rounded-full ${m.probe_status === "liquid_detected" ? "bg-success" : "bg-muted-foreground/50"}`} />
-                          {m.probe_status ?? "unknown"}
-                        </span>
-                      </td>
-                      <td className="p-3 hidden md:table-cell text-xs font-mono">{m.battery_level == null ? "—" : `${Number(m.battery_level).toFixed(1)}%`}</td>
+                      <td className="p-3 font-mono">{Number(m.temperature).toFixed(1)}°C</td>
                       <td className="p-3"><StatusBadge status={m.quality_status} color={statusToColor(m.quality_status)} /></td>
                       <td className="p-3 text-xs text-muted-foreground hidden md:table-cell">{m.latitude != null ? Number(m.latitude).toFixed(4) : "—"}, {m.longitude != null ? Number(m.longitude).toFixed(4) : "—"}</td>
                       <td className="p-3 text-xs text-muted-foreground hidden sm:table-cell">{new Date(m.created_at).toLocaleString("id-ID")}</td>

@@ -1,70 +1,52 @@
-export type LatexStatus = 
+export type LatexStatus =
   | "Mutu Prima"
-  | "Mutu Rendah Asam"
+  | "Mutu Rendah (Asam)"
   | "Terawetkan Amonia"
   | "Indikasi Oplos Air"
-  | "Indikasi Kontaminasi";
+  | "Indikasi Kontaminasi"
+  | "Tidak Ada Sampel";
 
-export type StatusColor = "success" | "danger" | "warning";
+export type StatusColor = "success" | "danger" | "warning" | "muted";
 
-export function classifyLatex(ph: number, tds: number): { status: LatexStatus; color: StatusColor } {
-  if (ph <= 6) return { status: "Mutu Rendah Asam", color: "danger" };
-  if (ph >= 9) return { status: "Terawetkan Amonia", color: "warning" };
-  if (tds <= 300) return { status: "Indikasi Oplos Air", color: "warning" };
-  if (tds >= 800) return { status: "Indikasi Kontaminasi", color: "warning" };
-  return { status: "Mutu Prima", color: "success" };
+/**
+ * Klasifikasi frontend menggunakan threshold PERSIS dari kode ESP32 (Program.cs BLOK 6):
+ * - TDS ≤ 200 → Tidak Ada Sampel (probe di udara)
+ * - pH ≤ 7.5  → Mutu Rendah (Asam)
+ * - pH ≥ 8.8  → Terawetkan Amonia
+ * - TDS ≤ 500 → Mutu Prima
+ * - TDS ≤ 1100 → Indikasi Kontaminasi
+ * - TDS > 1100 → Indikasi Oplos Air
+ */
+export function classifyLatex(ph: number | null, tds: number): { status: LatexStatus; color: StatusColor } {
+  if (tds <= 200) return { status: "Tidak Ada Sampel", color: "muted" };
+  if (ph != null && ph <= 7.5) return { status: "Mutu Rendah (Asam)", color: "danger" };
+  if (ph != null && ph >= 8.8) return { status: "Terawetkan Amonia", color: "warning" };
+  if (tds <= 500) return { status: "Mutu Prima", color: "success" };
+  if (tds <= 1100) return { status: "Indikasi Kontaminasi", color: "warning" };
+  return { status: "Indikasi Oplos Air", color: "warning" };
+}
+
+/**
+ * Konversi nama status ke warna badge.
+ * Mencakup semua 5 nilai mutu dari ESP32.
+ */
+export function statusToColor(status: string): StatusColor {
+  const s = status.toLowerCase();
+  if (s.includes("prima")) return "success";
+  if (s.includes("asam") || s.includes("buruk") || s.includes("rendah")) return "danger";
+  if (s.includes("amonia") || s.includes("awet") || s.includes("kontaminasi") || s.includes("oplos")) return "warning";
+  return "muted";
 }
 
 export interface SensorData {
   id: string;
   ownerName: string;
-  ph: number;
+  ph: number | null;
   tds: number;
   temperature: number;
   status: LatexStatus;
   statusColor: StatusColor;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   timestamp: string;
-}
-
-export function generateMockData(count: number = 20): SensorData[] {
-  const owners = ["Ahmad Sutisna", "Budi Hartono", "Citra Dewi", "Darmawan", "Eka Prasetya", "Fitri Handayani"];
-  const data: SensorData[] = [];
-  const now = Date.now();
-
-  for (let i = 0; i < count; i++) {
-    const ph = +(Math.random() * 6 + 4).toFixed(1);
-    const tds = Math.round(Math.random() * 1000 + 100);
-    const temp = +(Math.random() * 10 + 25).toFixed(1);
-    const { status, color } = classifyLatex(ph, tds);
-
-    data.push({
-      id: `m-${i + 1}`,
-      ownerName: owners[Math.floor(Math.random() * owners.length)],
-      ph,
-      tds,
-      temperature: temp,
-      status,
-      statusColor: color,
-      latitude: -(1.5 + Math.random() * 5),
-      longitude: 103 + Math.random() * 10,
-      timestamp: new Date(now - i * 3600000 * Math.random() * 24).toISOString(),
-    });
-  }
-  return data.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-}
-
-export function generateTimeSeriesData(hours: number = 24) {
-  const data = [];
-  const now = Date.now();
-  for (let i = hours; i >= 0; i--) {
-    data.push({
-      time: new Date(now - i * 3600000).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
-      ph: +(6.5 + Math.sin(i / 4) * 1.5 + Math.random() * 0.5).toFixed(1),
-      tds: Math.round(400 + Math.cos(i / 3) * 200 + Math.random() * 50),
-      temperature: +(28 + Math.sin(i / 6) * 3 + Math.random()).toFixed(1),
-    });
-  }
-  return data;
 }

@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { subscribeRealtime } from "@/lib/realtime";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
+import { MqttOwnerPopup } from "@/components/MqttOwnerPopup";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
@@ -42,7 +43,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           offlineNotified.delete(deviceId);
         }
       }
-      if (evt.type === "measurement:new") {
+      // Track last-seen dari data realtime MQTT maupun data yang sudah tersimpan
+      if (evt.type === "measurement:new" || evt.type === "measurement:realtime") {
         const m = evt.data as { device_id?: unknown };
         const deviceId = String(m.device_id ?? "").trim();
         if (deviceId) {
@@ -99,6 +101,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </div>
+      {/* Modal popup saat data MQTT/ESP32 baru diterima */}
+      <MqttOwnerPopup />
     </SidebarProvider>
   );
 }

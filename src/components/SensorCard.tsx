@@ -6,7 +6,7 @@ interface SensorCardProps {
   value: string | number;
   unit: string;
   icon: LucideIcon;
-  variant?: "primary" | "success" | "warning" | "danger";
+  variant?: "primary" | "success" | "warning" | "danger" | "muted";
   subtitle?: string;
 }
 
@@ -15,6 +15,7 @@ const variantStyles = {
   success: "sensor-card-success border-success/20",
   warning: "sensor-card-warning border-warning/20",
   danger: "sensor-card-danger border-destructive/20",
+  muted: "border-muted-foreground/20 opacity-80",
 };
 
 const iconBg = {
@@ -22,6 +23,7 @@ const iconBg = {
   success: "bg-success/10 text-success",
   warning: "bg-warning/10 text-warning",
   danger: "bg-destructive/10 text-destructive",
+  muted: "bg-muted text-muted-foreground",
 };
 
 function isNumericLike(v: string | number) {

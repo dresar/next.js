@@ -32,13 +32,8 @@ app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 // --- IoT ingest (MQTT) — modular handler with logging ---
 const handleMqtt = createMqttDataHandler(broadcastJson);
-createMqttClient(async ({ topic, payload, receivedAt }) => {
-  try {
-    await handleMqtt(topic, payload, receivedAt);
-  } catch (err) {
-    console.error("[mqtt] handler error", err);
-  }
-});
+// (Pemanggilan createMqttClient dipindah ke bawah, khusus untuk lokal berjalan 24 jam)
+
 
 app.post("/api/auth/login", async (req, res) => {
   const bodySchema = z.object({
@@ -547,9 +542,24 @@ app.get("/api/device-logs", requireAuth, async (req: AuthedRequest, res) => {
 });
 
 const server = http.createServer(app);
-attachWebsocketServer(server);
 
-server.listen(env.PORT, () => {
-  console.log(`API listening on http://localhost:${env.PORT}`);
-});
+// Jika berjalan secara lokal (bukan VERCEL), jalankan websocket & listener
+if (!process.env.VERCEL) {
+  // Hanya pakai WebSockets dan MQTT Background Worker secara lokal
+  attachWebsocketServer(server);
+  
+  createMqttClient(async ({ topic, payload, receivedAt }) => {
+    try {
+      await handleMqtt(topic, payload, receivedAt);
+    } catch (err) {
+      console.error("[mqtt] handler error", err);
+    }
+  });
+
+  server.listen(env.PORT, () => {
+    console.log(`API listening on http://localhost:${env.PORT}`);
+  });
+}
+
+export default app;
 

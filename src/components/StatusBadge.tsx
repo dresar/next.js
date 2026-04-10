@@ -4,6 +4,7 @@ const styles: Record<StatusColor, string> = {
   success: "bg-success/10 text-success border-success/20",
   warning: "bg-warning/10 text-warning border-warning/20",
   danger: "bg-destructive/10 text-destructive border-destructive/20",
+  muted: "bg-muted text-muted-foreground border-muted-foreground/20",
 };
 
 export function StatusBadge({ status, color }: { status: string; color: StatusColor }) {

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Bot, BarChart3, UserCircle, Settings, LogOut, Droplets, Cpu, Code2, Users } from "lucide-react";
+import { LayoutDashboard, BarChart3, UserCircle, Settings, LogOut, Droplets, Cpu, Users } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/use-auth";
 import { useNavigate } from "react-router-dom";
@@ -20,10 +20,7 @@ const menuItems = [
   { title: "Riwayat Data", url: "/measurements", icon: BarChart3 },
   { title: "Device Status", url: "/devices", icon: Cpu },
   { title: "Pemilik Latex", url: "/owners", icon: Users },
-  { title: "Program ESP32", url: "/program-esp32", icon: Code2 },
-  { title: "AI Assistant", url: "/ai-assistant", icon: Bot },
   { title: "Profil Pengguna", url: "/profile", icon: UserCircle },
-  { title: "Pengaturan Sistem", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {

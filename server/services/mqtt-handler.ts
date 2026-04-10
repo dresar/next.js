@@ -1,17 +1,28 @@
 import { getDeviceId, iotDataSchema, iotStatusSchema, normalizeTimestamp } from "../iot/parser";
-import { classifyLatexQuality, probeStatusFromDeviceStatus } from "../iot/classify";
-import { insertMeasurementFromMqtt, normalizeMeasurementRow, updateDeviceLastSeen } from "./measurements-db";
+import { classifyLatexQuality, probeStatusFromMutu } from "../iot/classify";
+import { updateDeviceLastSeen } from "./measurements-db";
 import { pool } from "../db/pool";
 import { broadcastJson } from "../realtime/ws";
 
-function mapMutuToQualityStatus(mutu: string | undefined | null) {
-  const s = String(mutu ?? "").trim().toLowerCase();
+/**
+ * Pemetaan nilai mutu dari ESP32 ke label Indonesia standar.
+ * Sesuai BLOK 6 kode ESP32 (Program.cs):
+ * - "PRIMA (OK)"      → Mutu Prima
+ * - "BURUK (ASAM)"    → Mutu Rendah (Asam)
+ * - "AWET (AMONIA)"   → Terawetkan Amonia
+ * - "KONTAMINASI"     → Indikasi Kontaminasi
+ * - "OPLOS AIR"       → Indikasi Oplos Air
+ * - "TIDAK ADA SAMPEL"→ diabaikan (probe di udara, jangan kirim ke dashboard)
+ */
+function mapMutuESP32(mutu: string | undefined | null): string | null {
+  const s = String(mutu ?? "").trim().toUpperCase();
   if (!s) return null;
-  if (s.includes("asam")) return "Mutu Rendah Asam";
-  if (s.includes("amonia")) return "Terawetkan Amonia";
-  if (s.includes("oplos")) return "Indikasi Oplos Air";
-  if (s.includes("kontaminasi")) return "Indikasi Kontaminasi";
-  if (s.includes("prima")) return "Mutu Prima";
+  if (s.includes("TIDAK ADA SAMPEL")) return null; // Guard: skip probe di udara
+  if (s.includes("PRIMA"))  return "Mutu Prima";
+  if (s.includes("BURUK") || s.includes("ASAM"))   return "Mutu Rendah (Asam)";
+  if (s.includes("AWET")  || s.includes("AMONIA")) return "Terawetkan Amonia";
+  if (s.includes("KONTAMINASI")) return "Indikasi Kontaminasi";
+  if (s.includes("OPLOS"))  return "Indikasi Oplos Air";
   return null;
 }
 
@@ -26,79 +37,86 @@ export function createMqttDataHandler(broadcast: (msg: unknown) => void = broadc
       const p = parsed.data;
       const topicOwner = topic.startsWith("skripsi/") ? topic.split("/")[1] : undefined;
       const ownerName = (p.owner_name ?? p.ownerName ?? topicOwner ?? "Unknown").toString();
-      const deviceId = getDeviceId(p, `esp32-${ownerName || "device"}`);
+      const deviceId = getDeviceId(p, `esp32-lateks`);
       const createdAt = normalizeTimestamp(p.timestamp ?? receivedAt.getTime());
-      const firmwareVersion = p.firmware_version ?? p.firmware ?? null;
-      const mappedQuality = mapMutuToQualityStatus(p.quality_status);
-      const qualityStatus = mappedQuality ?? classifyLatexQuality({ ph: p.ph ?? null, tds: p.tds });
-      const deviceStatus = p.status ?? (p.tds > 20 ? "liquid_detected" : "probe_dry");
-      const probeStatus = probeStatusFromDeviceStatus(deviceStatus);
 
-      console.log("[mqtt] data received:", { deviceId, temp: p.temperature, tds: p.tds, volt: p.voltage, battery: p.battery, status: deviceStatus, probe: probeStatus });
+      // Mutu dari ESP32 → label Indonesia
+      const mappedMutu = mapMutuESP32(p.quality_status ?? p.mutu);
 
-      if (ownerName && ownerName !== "Unknown") {
-        await pool.query(
-          `
-          INSERT INTO public.latex_owners (name)
-          VALUES ($1)
-          ON CONFLICT (name) DO NOTHING
-          `,
-          [ownerName]
-        );
+      // GUARD: Jika ESP32 mengirim "TIDAK ADA SAMPEL" (probe di udara) → abaikan
+      if (mappedMutu === null && (p.quality_status || p.mutu)) {
+        const rawMutu = String(p.quality_status ?? p.mutu ?? "").toUpperCase();
+        if (rawMutu.includes("TIDAK ADA SAMPEL")) {
+          console.log("[mqtt] probe di udara (TIDAK ADA SAMPEL), data diabaikan.");
+          // Tetap update device last-seen tapi tidak broadcast ke frontend
+          await updateDeviceLastSeen(deviceId, receivedAt, { last_status: "probe_dry" });
+          return;
+        }
       }
 
-      const row = await insertMeasurementFromMqtt({
-        owner_name: ownerName,
-        ph_value: p.ph ?? null,
-        tds_value: Math.round(p.tds),
-        temperature: p.temperature,
-        quality_status: qualityStatus,
-        latitude: p.latitude ?? null,
-        longitude: p.longitude ?? null,
-        device_id: deviceId,
-        voltage_probe: p.voltage ?? null,
-        battery_level: p.battery ?? null,
-        device_status: deviceStatus,
-        probe_status: probeStatus,
-        firmware_version: firmwareVersion,
-        created_at: createdAt,
+      // Fallback klasifikasi jika mutu tidak tersedia
+      const qualityStatus = mappedMutu ?? classifyLatexQuality({ ph: p.ph ?? null, tds: p.tds });
+
+      // Probe status: liquid_detected jika data valid masuk ke sini
+      const probeStatus = probeStatusFromMutu(qualityStatus);
+
+      console.log("[mqtt] data diterima (ESP32):", {
+        deviceId,
+        ph: p.ph,
+        tds: p.tds,
+        temp: p.temperature,
+        mutu: qualityStatus,
+        probe: probeStatus,
       });
 
+      // Update device last-seen
       await updateDeviceLastSeen(deviceId, receivedAt, {
-        battery_level: p.battery ?? null,
-        firmware_version: firmwareVersion,
-        last_status: deviceStatus,
+        battery_level: null,
+        firmware_version: null,
+        last_status: "liquid_detected",
       });
 
+      // Log ke device_logs untuk debugging
       const logPayload =
         typeof payload === "object" && payload != null
-          ? { ...((payload as Record<string, unknown>) ?? {}), device_id: deviceId, owner_name: ownerName, status: deviceStatus, timestamp: createdAt.toISOString() }
-          : { payload, device_id: deviceId, owner_name: ownerName, status: deviceStatus, timestamp: createdAt.toISOString() };
+          ? { ...(payload as Record<string, unknown>), device_id: deviceId, quality_status: qualityStatus }
+          : { payload, device_id: deviceId, quality_status: qualityStatus };
 
       await pool.query(
-        `INSERT INTO public.device_logs (device_id, topic, payload, received_at, measurement_id) VALUES ($1, $2, $3, $4, $5)`,
-        [deviceId, topic, logPayload, receivedAt, row.id]
+        `INSERT INTO public.device_logs (device_id, topic, payload, received_at) VALUES ($1, $2, $3, $4)`,
+        [deviceId, topic, logPayload, receivedAt]
       );
 
-      const normalized = normalizeMeasurementRow(row);
-      broadcast({ type: "measurement:new", data: normalized });
+      // Broadcast ke frontend — hanya 4 field dari ESP32 + derived fields
+      // TIDAK disimpan ke DB — hanya masuk DB jika user klik Simpan di modal
+      broadcast({
+        type: "measurement:realtime",
+        data: {
+          ph_value: p.ph ?? null,
+          tds_value: Math.round(p.tds),
+          temperature: p.temperature,
+          quality_status: qualityStatus,
+          probe_status: probeStatus,
+          device_id: deviceId,
+          owner_name: ownerName !== "Unknown" ? ownerName : null,
+          source: "mqtt",
+          created_at: createdAt.toISOString(),
+        },
+      });
+
       broadcast({
         type: "device:status",
         data: {
           device_id: deviceId,
           wifi_connected: null,
           mqtt_connected: true,
-          battery_level: p.battery ?? null,
-          firmware_version: firmwareVersion,
-          status: deviceStatus,
+          battery_level: null,
+          firmware_version: null,
+          status: "liquid_detected",
           at: receivedAt.toISOString(),
         },
       });
-      console.log("[mqtt] measurement saved and broadcast, id:", row.id);
 
-      if (deviceStatus && ["temp_error", "probe_dry", "sensor_disconnected"].some((x) => String(deviceStatus).toLowerCase().includes(x))) {
-        broadcast({ type: "device:warning", data: { device_id: deviceId, status: deviceStatus, at: receivedAt.toISOString() } });
-      }
     } else if (topic === "latex/iot/status") {
       const parsed = iotStatusSchema.safeParse(payload);
       if (!parsed.success) {
@@ -107,12 +125,11 @@ export function createMqttDataHandler(broadcast: (msg: unknown) => void = broadc
       }
       const p = parsed.data;
       const deviceId = getDeviceId(p);
-      const firmwareVersion = p.firmware_version ?? p.firmware ?? null;
       const wifi = p.wifi_connected ?? p.wifi ?? null;
       const mqttConnected = p.mqtt_connected ?? p.mqtt ?? null;
       const deviceStatus = p.status ?? null;
 
-      console.log("[mqtt] status received:", { deviceId, wifi, mqtt: mqttConnected, battery: p.battery, status: deviceStatus });
+      console.log("[mqtt] status received:", { deviceId, wifi, mqtt: mqttConnected });
 
       await pool.query(
         `
@@ -127,7 +144,7 @@ export function createMqttDataHandler(broadcast: (msg: unknown) => void = broadc
           last_status_at = EXCLUDED.last_status_at,
           last_status = COALESCE(EXCLUDED.last_status, public.devices.last_status)
         `,
-        [deviceId, wifi, mqttConnected, p.battery ?? null, firmwareVersion, receivedAt, deviceStatus]
+        [deviceId, wifi, mqttConnected, null, null, receivedAt, deviceStatus]
       );
 
       await pool.query(
@@ -141,8 +158,8 @@ export function createMqttDataHandler(broadcast: (msg: unknown) => void = broadc
           device_id: deviceId,
           wifi_connected: wifi,
           mqtt_connected: mqttConnected,
-          battery_level: p.battery ?? null,
-          firmware_version: firmwareVersion,
+          battery_level: null,
+          firmware_version: null,
           status: deviceStatus,
           at: receivedAt.toISOString(),
         },

@@ -1,83 +1,116 @@
-import { useEffect, useState } from "react";
-import { subscribeRealtime } from "@/lib/realtime";
+import { useEffect, useRef, useState } from "react";
+import { subscribeRealtime, subscribeMqttStatus, MqttStatus } from "@/lib/realtime";
 import { apiFetch } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { MapPin, Droplets } from "lucide-react";
+import { Droplets, Wifi, WifiOff, Loader2, ChevronDown, Check, BellOff, Bell, MapPin } from "lucide-react";
 
-type PendingMeasurement = {
-  id: string;
-  owner_name: string | null;
+const MODAL_ENABLED_KEY = "mqttModalEnabled";
+
+// Field yang dikirim ESP32 + derived fields dari server
+type RealtimeData = {
   ph_value: number | null;
   tds_value: number;
   temperature: number;
   quality_status: string;
+  probe_status: string | null;
   device_id: string | null;
-  source: string | null;
+  owner_name: string | null;
+  source: string;
   created_at: string;
 };
 
+
+
+/** Mutu ESP32 yang menandakan probe di udara — jangan tampilkan modal */
+const SKIP_STATUSES = ["tidak ada sampel", "probe_dry"];
+
+function shouldSkip(qualityStatus: string | null | undefined): boolean {
+  const s = (qualityStatus ?? "").trim().toLowerCase();
+  return SKIP_STATUSES.some((x) => s.includes(x));
+}
+
 export function MqttOwnerPopup() {
-  const [pending, setPending] = useState<PendingMeasurement | null>(null);
+  const [pending, setPending] = useState<RealtimeData | null>(null);
   const [ownerName, setOwnerName] = useState("");
   const [owners, setOwners] = useState<string[]>([]);
-  const [history, setHistory] = useState<PendingMeasurement[]>([]);
   const [loading, setLoading] = useState(false);
+  const [mqttStatus, setMqttStatus] = useState<MqttStatus>("connecting");
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [modalEnabled, setModalEnabled] = useState<boolean>(
+    () => localStorage.getItem(MODAL_ENABLED_KEY) !== "false"
+  );
 
+  const inputRef = useRef<HTMLInputElement>(null);
+  const queueRef = useRef<RealtimeData[]>([]);
+  const hasActiveRef = useRef(false);
+
+  const toggleModal = () => {
+    setModalEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem(MODAL_ENABLED_KEY, String(next));
+      if (!next) { setPending(null); hasActiveRef.current = false; }
+      return next;
+    });
+  };
+
+  const showNext = () => {
+    const next = queueRef.current.shift();
+    if (next) {
+      hasActiveRef.current = true;
+      setPending(next);
+      setOwnerName((next.owner_name ?? "").trim());
+    } else {
+      hasActiveRef.current = false;
+    }
+  };
+
+  const addToQueue = (data: RealtimeData) => {
+    if (!modalEnabled) return;
+    if (shouldSkip(data.quality_status)) return; // probe di udara, skip
+    if (hasActiveRef.current) {
+      if (!queueRef.current.find((x) => x.created_at === data.created_at)) {
+        queueRef.current.push(data);
+      }
+    } else {
+      hasActiveRef.current = true;
+      setPending(data);
+      setOwnerName((data.owner_name ?? "").trim());
+    }
+  };
+
+  // Subscribe WebSocket server
   useEffect(() => {
     const unsub = subscribeRealtime((evt) => {
-      if (evt.type === "measurement:new") {
-        const m = evt.data as PendingMeasurement;
-        const isMqtt = String(m.source ?? "").toLowerCase() === "mqtt";
-        if (!isMqtt) return;
-        if (pending) return;
-        setPending(m);
-        setOwnerName((m.owner_name ?? "").trim());
+      if (evt.type === "measurement:realtime") {
+        addToQueue(evt.data as RealtimeData);
       }
     });
     return () => unsub();
-  }, [pending]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalEnabled]);
 
+  // Status koneksi MQTT shared
   useEffect(() => {
-    if (!pending?.id) return;
+    return subscribeMqttStatus(setMqttStatus);
+  }, []);
+
+  // Ambil daftar nama pemilik
+  useEffect(() => {
+    if (!pending) return;
     apiFetch<string[]>("/api/owners")
       .then((rows) => setOwners(rows))
       .catch(() => setOwners([]));
-  }, [pending?.id]);
-
-  useEffect(() => {
-    const q = ownerName.trim();
-    if (!q) {
-      setHistory([]);
-      return;
-    }
-    apiFetch<Record<string, unknown>[]>(`/api/measurements?owner=${encodeURIComponent(q)}&limit=10`)
-      .then((rows) => {
-        const next = rows.map((r) => ({
-          id: String(r.id),
-          owner_name: String(r.owner_name ?? ""),
-          ph_value: (r.ph_value ?? null) as number | null,
-          tds_value: Number(r.tds_value) || 0,
-          temperature: Number(r.temperature) || 0,
-          quality_status: String(r.quality_status ?? ""),
-          device_id: (r.device_id ?? null) as string | null,
-          source: (r.source ?? null) as string | null,
-          created_at: String(r.created_at),
-        }));
-        setHistory(next.slice(0, 5));
-      })
-      .catch(() => setHistory([]));
-  }, [ownerName]);
+  }, [pending]);
 
   const handleSave = async () => {
     if (!pending || !ownerName.trim()) {
@@ -90,19 +123,27 @@ export function MqttOwnerPopup() {
       let lng: number | null = null;
       try {
         const pos = await new Promise<GeolocationPosition>((res, rej) =>
-          navigator.geolocation.getCurrentPosition(res, rej, { timeout: 8000, enableHighAccuracy: true })
+          navigator.geolocation.getCurrentPosition(res, rej, { timeout: 8000 })
         );
         lat = pos.coords.latitude;
         lng = pos.coords.longitude;
-      } catch {
-        toast.info("Lokasi GPS tidak tersedia. Data disimpan tanpa koordinat.");
-      }
-      await apiFetch(`/api/measurements/${pending.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ owner_name: ownerName.trim(), latitude: lat, longitude: lng }),
+      } catch { /* tanpa GPS */ }
+
+      // POST → simpan ke database
+      await apiFetch("/api/measurements", {
+        method: "POST",
+        body: JSON.stringify({
+          ownerName: ownerName.trim(),
+          ph: pending.ph_value,
+          tds: pending.tds_value,
+          temperature: pending.temperature,
+          latitude: lat,
+          longitude: lng,
+        }),
       });
-      toast.success("Data berhasil dilengkapi!");
+      toast.success(`✅ Tersimpan! Pemilik: ${ownerName.trim()}`);
       setPending(null);
+      showNext();
     } catch (err) {
       toast.error((err as { message?: string })?.message ?? "Gagal menyimpan");
     } finally {
@@ -112,78 +153,142 @@ export function MqttOwnerPopup() {
 
   const handleSkip = () => {
     setPending(null);
+    showNext();
   };
 
+  const filteredOwners = owners.filter((n) =>
+    n.toLowerCase().includes(ownerName.toLowerCase())
+  );
+
+  // Warna badge mutu
+  const qualityColor =
+    (pending?.quality_status ?? "").toLowerCase().includes("prima") ? "text-green-600 dark:text-green-400 bg-green-500/10" :
+    (pending?.quality_status ?? "").toLowerCase().includes("asam") || (pending?.quality_status ?? "").toLowerCase().includes("buruk") ? "text-red-600 dark:text-red-400 bg-red-500/10" :
+    "text-yellow-600 dark:text-yellow-400 bg-yellow-500/10";
+
   return (
-    <Dialog open={!!pending} onOpenChange={(open) => !open && setPending(null)}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Droplets className="h-5 w-5 text-primary" />
-            Data Sensor Baru Diterima
-          </DialogTitle>
-          <DialogDescription>
-            Data pH/TDS/Suhu diterima dari ESP32. Masukkan (atau konfirmasi) nama pemilik untuk menyimpan identitas dan riwayat.
-          </DialogDescription>
-        </DialogHeader>
-        {pending && (
-          <div className="space-y-4 py-2">
-            <div className="rounded-lg bg-muted/50 p-3 text-sm">
-              <p className="font-medium text-muted-foreground">Data sensor:</p>
-              <p className="mt-1 font-mono">
-                pH: {pending.ph_value == null ? "—" : Number(pending.ph_value).toFixed(2)} · TDS:{" "}
-                {pending.tds_value} ppm · Suhu: {pending.temperature}°C · {pending.quality_status}
-              </p>
-              {pending.device_id && (
-                <p className="mt-1 text-xs text-muted-foreground">Device: {pending.device_id}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="owner">Nama Pemilik Latex</Label>
-              <Input
-                id="owner"
-                placeholder="Contoh: Ahmad Sutisna"
-                value={ownerName}
-                onChange={(e) => setOwnerName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSave()}
-                list="owner-suggestions"
-              />
-              <datalist id="owner-suggestions">
-                {owners.map((n) => (
-                  <option key={n} value={n} />
-                ))}
-              </datalist>
-            </div>
-            <p className="flex items-center gap-2 text-xs text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5" />
-              Lokasi akan diambil otomatis saat Anda klik Simpan
-            </p>
-            {history.length > 0 && (
-              <div className="rounded-lg border bg-card p-3">
-                <div className="text-xs font-semibold text-muted-foreground">Riwayat (terakhir)</div>
-                <div className="mt-2 space-y-1 text-xs">
-                  {history.map((h) => (
-                    <div key={h.id} className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground">{new Date(h.created_at).toLocaleString("id-ID")}</span>
-                      <span className="font-mono">
-                        pH {h.ph_value == null ? "—" : Number(h.ph_value).toFixed(2)} · TDS {h.tds_value} · {h.quality_status}
-                      </span>
-                    </div>
-                  ))}
+    <>
+      {/* Indikator MQTT + toggle modal */}
+      <div className="fixed bottom-4 right-4 z-40 flex items-center gap-1.5 rounded-full bg-card border border-border shadow-md px-3 py-1.5 text-xs select-none">
+        {mqttStatus === "connected" ? (
+          <><Wifi className="h-3.5 w-3.5 text-green-500" /><span className="text-green-600 dark:text-green-400 font-medium">MQTT Live</span></>
+        ) : mqttStatus === "connecting" ? (
+          <><Loader2 className="h-3.5 w-3.5 animate-spin text-yellow-500" /><span className="text-yellow-600 dark:text-yellow-400">Connecting</span></>
+        ) : (
+          <><WifiOff className="h-3.5 w-3.5 text-red-500" /><span className="text-red-600 dark:text-red-400">Offline</span></>
+        )}
+        <span className="h-3 w-px bg-border" />
+        <button
+          onClick={toggleModal}
+          title={modalEnabled ? "Matikan popup" : "Aktifkan popup"}
+          className={`flex items-center gap-1 rounded-full px-2 py-0.5 transition-colors ${
+            modalEnabled
+              ? "bg-primary/10 text-primary hover:bg-primary/20"
+              : "bg-muted text-muted-foreground hover:bg-muted/80"
+          }`}
+        >
+          {modalEnabled ? <Bell className="h-3 w-3" /> : <BellOff className="h-3 w-3" />}
+          <span>{modalEnabled ? "ON" : "OFF"}</span>
+        </button>
+      </div>
+
+      {/* Modal data ESP32 baru */}
+      <Dialog open={!!pending && modalEnabled} onOpenChange={(open) => !open && handleSkip()}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Droplets className="h-4 w-4 text-primary" />
+              Data Sensor ESP32 Masuk
+            </DialogTitle>
+          </DialogHeader>
+
+          {pending && (
+            <div className="space-y-4">
+              {/* Data sensor dari ESP32 */}
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg bg-muted/60 p-2.5">
+                  <p className="text-[10px] text-muted-foreground mb-0.5">pH</p>
+                  <p className="font-mono font-bold text-sm">
+                    {pending.ph_value == null ? "—" : Number(pending.ph_value).toFixed(2)}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-muted/60 p-2.5">
+                  <p className="text-[10px] text-muted-foreground mb-0.5">TDS</p>
+                  <p className="font-mono font-bold text-sm">{pending.tds_value}<span className="text-[10px] font-normal"> ppm</span></p>
+                </div>
+                <div className="rounded-lg bg-muted/60 p-2.5">
+                  <p className="text-[10px] text-muted-foreground mb-0.5">Suhu</p>
+                  <p className="font-mono font-bold text-sm">{Number(pending.temperature).toFixed(1)}<span className="text-[10px] font-normal">°C</span></p>
                 </div>
               </div>
-            )}
-          </div>
-        )}
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={handleSkip} disabled={loading}>
-            Tutup
-          </Button>
-          <Button onClick={handleSave} disabled={loading || !ownerName.trim()}>
-            {loading ? "Menyimpan..." : "Simpan"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+
+              {/* Badge status mutu */}
+              <div className="flex justify-center">
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${qualityColor}`}>
+                  {pending.quality_status}
+                </span>
+              </div>
+
+              {/* Combobox nama pemilik */}
+              <div className="space-y-1.5">
+                <Label htmlFor="owner-input" className="text-sm">Nama Pemilik Latex</Label>
+                <div className="relative">
+                  <Input
+                    ref={inputRef}
+                    id="owner-input"
+                    placeholder="Ketik atau pilih nama..."
+                    value={ownerName}
+                    autoComplete="off"
+                    onChange={(e) => { setOwnerName(e.target.value); setShowDropdown(true); }}
+                    onFocus={() => setShowDropdown(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { setShowDropdown(false); handleSave(); }
+                      if (e.key === "Escape") setShowDropdown(false);
+                    }}
+                    autoFocus
+                    className="pr-8"
+                  />
+                  <ChevronDown
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground cursor-pointer"
+                    onClick={() => { setShowDropdown((v) => !v); inputRef.current?.focus(); }}
+                  />
+                  {showDropdown && filteredOwners.length > 0 && (
+                    <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-lg max-h-44 overflow-y-auto">
+                      {filteredOwners.map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors text-left"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setOwnerName(n);
+                            setShowDropdown(false);
+                          }}
+                        >
+                          {n.toLowerCase() === ownerName.toLowerCase() && (
+                            <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+                          )}
+                          <span className={n.toLowerCase() === ownerName.toLowerCase() ? "font-medium" : ""}>{n}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <MapPin className="h-3 w-3" /> Lokasi GPS diambil otomatis saat klik Simpan
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={handleSkip} disabled={loading}>Lewati</Button>
+            <Button size="sm" onClick={handleSave} disabled={loading || !ownerName.trim()}>
+              {loading ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Menyimpan...</> : "Simpan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
