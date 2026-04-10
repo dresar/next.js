@@ -70,11 +70,18 @@ const Dashboard = () => {
       lat = pos.coords.latitude;
       lng = pos.coords.longitude;
     } catch { /* tanpa GPS */ }
+    const phVal = formData.ph ? parseFloat(formData.ph) : null;
+    const tdsVal = parseInt(formData.tds) || 0;
+    const tempVal = parseFloat(formData.temperature) || 0;
+    const { status } = classifyLatex(phVal, tdsVal);
+
     const { error } = await insert({
       ownerName: formData.ownerName,
-      ph: formData.ph ? parseFloat(formData.ph) : undefined,
-      tds: parseInt(formData.tds),
-      temperature: parseFloat(formData.temperature),
+      ph: phVal,
+      tds: tdsVal,
+      temperature: tempVal,
+      quality_status: status,
+      probe_status: "liquid_detected",
       latitude: lat,
       longitude: lng,
     });

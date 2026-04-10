@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/query-client";
 import { apiFetch } from "@/lib/api";
 import { subscribeRealtime } from "@/lib/realtime";
 
@@ -45,48 +47,63 @@ function normalizeMeasurement(m: Record<string, unknown>): Measurement {
     source: String(m.source ?? "manual"),
   };
 }
+export async function prefetchMeasurements() {
+  await queryClient.prefetchQuery({
+    queryKey: ["measurements"],
+    queryFn: async () => {
+      const rows = await apiFetch<Record<string, unknown>[]>("/api/measurements");
+      return rows.map(normalizeMeasurement);
+    },
+  });
+}
 
 export function useMeasurements() {
-  const [data, setData] = useState<Measurement[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchData = async () => {
-    try {
+  const { data = [], isLoading: loading, refetch } = useQuery({
+    queryKey: ["measurements"],
+    queryFn: async () => {
       const rows = await apiFetch<Record<string, unknown>[]>("/api/measurements");
-      setData(rows.map(normalizeMeasurement));
-    } finally {
-      setLoading(false);
-    }
-  };
+      return rows.map(normalizeMeasurement);
+    },
+  });
 
   useEffect(() => {
-    fetchData();
+    // Inject realtime data ke dalam Cache React Query
     const unsub = subscribeRealtime((evt) => {
-      if (evt.type === "measurement:new") {
+      // Kita pakai "measurement:new" atau "measurement:realtime"
+      // Di arsitektur Serverless Vercel, "measurement:new" tak jalan dr WS, tapi kita pakai manual cache mutasi.
+      // Bagaimanapun, kita biarkan saja ini buat safety jika sewaktu-waktu ESP32 dipantau 1 arah.
+      if (evt.type === "measurement:realtime" || evt.type === "measurement:new") {
         const raw = evt.data as Record<string, unknown>;
         const m = normalizeMeasurement(raw);
-        setData((prev) => {
-          const next = [m, ...prev.filter((x) => x.id !== m.id)];
-          return next.slice(0, 500);
+        
+        queryClient.setQueryData<Measurement[]>(["measurements"], (prev) => {
+          if (!prev) return [m];
+          // Hindari duplikat ID/timestamp (MQTT bisa kirim beruntun berulang)
+          if (m.id !== "undefined" && prev.find((x) => x.id === m.id)) return prev;
+          
+          const next = [m, ...prev.filter(x => x.id !== m.id)];
+          return next.slice(0, 500); // Batasi 500 biar tidak berat
         });
       }
     });
     return () => unsub();
   }, []);
 
-  return { data, loading, refetch: fetchData };
+  return { data, loading, refetch };
 }
 
 export function useInsertMeasurement() {
-  const insert = async (params: {
-    ownerName: string;
-    ph: number;
-    tds: number;
-    temperature: number;
-    latitude?: number;
-    longitude?: number;
-  }) => {
-    try {
+  const mutation = useMutation({
+    mutationFn: async (params: {
+      ownerName: string;
+      ph: number | null;
+      tds: number;
+      temperature: number;
+      quality_status: string;
+      probe_status: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
+    }) => {
       await apiFetch("/api/measurements", {
         method: "POST",
         body: JSON.stringify({
@@ -97,8 +114,31 @@ export function useInsertMeasurement() {
           latitude: params.latitude ?? null,
           longitude: params.longitude ?? null,
           deviceStatus: null,
+          quality_status: params.quality_status, // Ensure custom UI sets logic passes backend
         }),
       });
+      return params;
+    },
+    onSuccess: (params) => {
+      // Sengaja Fetch ulang latar belakang untuk kepastian DB (meski lambat di Vercel),
+      // ATAU Injeksi Manual di Popup MQTT.
+      // Untuk pastinya kita invalidate agar di background terupdate.
+      queryClient.invalidateQueries({ queryKey: ["measurements"] });
+    }
+  });
+
+  const insert = async (params: {
+    ownerName: string;
+    ph: number | null;
+    tds: number;
+    temperature: number;
+    quality_status: string;
+    probe_status: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+  }) => {
+    try {
+      await mutation.mutateAsync(params);
       return { error: null as null | { message: string } };
     } catch (err) {
       const message = (err as { message?: string })?.message ?? "Gagal menyimpan data";

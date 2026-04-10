@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Droplets, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { prefetchMeasurements } from "@/hooks/use-measurements";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -20,6 +21,8 @@ const Login = () => {
     setLoading(true);
     try {
       await signIn(email, password);
+      // Hard Cache Prefetch (Background) 
+      prefetchMeasurements().catch(console.error);
       navigate("/");
     } catch (err) {
       const message = (err as { message?: string })?.message ?? "Gagal login";
@@ -32,6 +35,8 @@ const Login = () => {
     setLoading(true);
     try {
       await demoLogin();
+      // Hard Cache Prefetch (Background)
+      prefetchMeasurements().catch(console.error);
       navigate("/");
     } catch (err) {
       const message = (err as { message?: string })?.message ?? "Gagal quick login";

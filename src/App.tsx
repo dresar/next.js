@@ -16,8 +16,7 @@ import DataLogger from "./pages/DataLogger";
 import OtaMonitor from "./pages/OtaMonitor";
 import OwnersPage from "./pages/OwnersPage";
 
-const queryClient = new QueryClient();
-
+import { queryClient } from "@/lib/query-client";
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
