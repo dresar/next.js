@@ -30,7 +30,23 @@ export function useRealtimeSensor() {
         setSensor(evt.data as RealtimeSensorData);
       }
     });
-    return () => unsub();
+
+    // Cek keaktifan setiap 10 detik. Jika data terakhir lebih dari 60 detik, anggap mati.
+    const timer = setInterval(() => {
+      setSensor((current) => {
+        if (!current) return null;
+        const last = new Date(current.created_at).getTime();
+        if (Date.now() - last > 60000) {
+          return null; // Timeout: perangkat offline
+        }
+        return current;
+      });
+    }, 10000);
+
+    return () => {
+      unsub();
+      clearInterval(timer);
+    };
   }, []);
 
   return sensor;

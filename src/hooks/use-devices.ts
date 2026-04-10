@@ -19,6 +19,7 @@ export function useDevices() {
   const [offlineAfterSeconds, setOfflineAfterSeconds] = useState(60);
   const [loading, setLoading] = useState(true);
   const [warnings, setWarnings] = useState<{ device_id: string; status: string; at: string }[]>([]);
+  const [now, setNow] = useState(Date.now());
 
   const fetchDevices = async () => {
     const res = await apiFetch<{ offline_after_seconds: number; devices: Device[] }>("/api/devices");
@@ -29,6 +30,12 @@ export function useDevices() {
 
   useEffect(() => {
     fetchDevices().catch(() => setLoading(false));
+
+    // Update 'now' setiap 10 detik agar status offline terdeteksi secara realtime
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 10000);
+
     const unsub = subscribeRealtime((evt) => {
       if (evt.type === "device:status") {
         const d = evt.data as any;
@@ -52,17 +59,20 @@ export function useDevices() {
         setWarnings((prev) => [{ device_id: w.device_id, status: w.status, at: w.at }, ...prev].slice(0, 50));
       }
     });
-    return () => unsub();
+    return () => {
+      unsub();
+      clearInterval(timer);
+    };
   }, []);
 
   const deviceStatus = useMemo(() => {
-    const now = Date.now();
     return devices.map((d) => {
       const last = d.last_seen ? new Date(d.last_seen).getTime() : 0;
-      const online = last > 0 && (now - last) / 1000 <= offlineAfterSeconds;
+      // Perangkat mati jika tidak ada data selama > 1 menit (60 detik)
+      const online = last > 0 && (now - last) / 1000 <= 60; 
       return { ...d, online };
     });
-  }, [devices, offlineAfterSeconds]);
+  }, [devices, now]);
 
   return { devices: deviceStatus, warnings, loading, offlineAfterSeconds, refetch: fetchDevices };
 }
