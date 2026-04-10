@@ -356,7 +356,6 @@ const Measurements = () => {
         </div>
 
         <div className="rounded-xl border bg-card overflow-hidden">
-        <div className="rounded-xl border bg-card overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -412,7 +411,6 @@ const Measurements = () => {
                 </tbody>
               </table>
             </div>
-          )}
           {!loading && filtered.length === 0 && (
             <div className="p-8 text-center text-muted-foreground">Tidak ada data. Klik &quot;Tambah&quot; untuk menambah.</div>
           )}
@@ -444,6 +442,7 @@ const Measurements = () => {
                 </Button>
               </div>
             </div>
+          )}
         </div>
       </div>
 
