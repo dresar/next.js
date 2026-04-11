@@ -39,16 +39,16 @@ const owners = [
   "Vina Maharani",
 ];
 
-async function upsertUser(params: { email: string; password: string }) {
+async function upsertUser(params: { email: string; password: string; role: string }) {
   const passwordHash = await bcrypt.hash(params.password, 10);
-  const res = await pool.query<{ id: string; email: string }>(
+  const res = await pool.query<{ id: string; email: string; role: string }>(
     `
-    INSERT INTO public.users (email, password_hash)
-    VALUES ($1, $2)
-    ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
-    RETURNING id, email
+    INSERT INTO public.users (email, password_hash, role)
+    VALUES ($1, $2, $3)
+    ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = EXCLUDED.role
+    RETURNING id, email, role
     `,
-    [params.email, passwordHash]
+    [params.email, passwordHash, params.role]
   );
   return res.rows[0]!;
 }
@@ -117,15 +117,24 @@ async function seedMeasurements(userIds: string[]) {
 }
 
 async function main() {
-  const users: { id: string; email: string }[] = [];
+  const users: { id: string; email: string; role: string }[] = [];
 
-  // 1 demo user + 19 additional users (20 total)
-  users.push(await upsertUser({ email: "demo@latexguard.local", password: "demo12345" }));
-  for (let i = 1; i < 20; i++) {
+  // Admin accounts
+  users.push(await upsertUser({ email: "demo@latexguard.local", password: "demo12345", role: "admin" }));
+
+  // Petani demo accounts
+  const petani1 = await upsertUser({ email: "petani1@latexguard.local", password: "petani123", role: "petani" });
+  const petani2 = await upsertUser({ email: "petani2@latexguard.local", password: "petani123", role: "petani" });
+  const petani3 = await upsertUser({ email: "petani3@latexguard.local", password: "petani123", role: "petani" });
+  users.push(petani1, petani2, petani3);
+
+  // Additional admin users
+  for (let i = 1; i < 17; i++) {
     const n = String(i).padStart(2, "0");
-    users.push(await upsertUser({ email: `user${n}@latexguard.local`, password: "password123" }));
+    users.push(await upsertUser({ email: `user${n}@latexguard.local`, password: "password123", role: "admin" }));
   }
 
+  // Profiles
   for (let i = 0; i < users.length; i++) {
     const u = users[i]!;
     await upsertProfile({
@@ -136,23 +145,77 @@ async function main() {
     });
   }
 
+  // -- Assign owners to petani --
+  // Clear existing assignments
+  await pool.query(`DELETE FROM public.farmer_owners`);
+
+  // Petani 1: Ahmad Sutisna, Budi Hartono, Citra Dewi, Darmawan, Eka Prasetya
+  for (const name of owners.slice(0, 5)) {
+    await pool.query(
+      `INSERT INTO public.farmer_owners (user_id, owner_name) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [petani1.id, name]
+    );
+  }
+
+  // Petani 2: Fitri Handayani, Galih Wicaksono, Hana Putri, Indra Wijaya, Joko Santoso
+  for (const name of owners.slice(5, 10)) {
+    await pool.query(
+      `INSERT INTO public.farmer_owners (user_id, owner_name) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [petani2.id, name]
+    );
+  }
+
+  // Petani 3: Kartika Sari, Lukman Hakim, Maya Lestari, Nanda Pratama, Oki Ramadhan
+  for (const name of owners.slice(10, 15)) {
+    await pool.query(
+      `INSERT INTO public.farmer_owners (user_id, owner_name) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [petani3.id, name]
+    );
+  }
+
+  // -- Seed notifications --
+  await pool.query(`DELETE FROM public.notifications`);
+
+  const notifs = [
+    { userId: petani1.id, title: "Selamat Datang! 🎉", message: "Akun petani Anda berhasil dibuat. Anda memiliki 5 pemilik latex yang di-assign.", type: "success" },
+    { userId: petani1.id, title: "⚠️ Peringatan Mutu: Ahmad Sutisna", message: "Kualitas lateks terdeteksi \"Mutu Rendah Asam\". pH: 5.2, TDS: 450 ppm.", type: "warning" },
+    { userId: petani1.id, title: "📊 Data Baru Masuk", message: "Pengukuran baru untuk Budi Hartono telah dicatat oleh sistem.", type: "info" },
+    { userId: petani2.id, title: "Selamat Datang! 🎉", message: "Akun petani Anda berhasil dibuat. Anda memiliki 5 pemilik latex yang di-assign.", type: "success" },
+    { userId: petani2.id, title: "📋 Owner Baru Ditambahkan", message: "Admin telah menambahkan \"Joko Santoso\" ke daftar pemilik latex Anda.", type: "info" },
+    { userId: petani3.id, title: "Selamat Datang! 🎉", message: "Akun petani Anda berhasil dibuat. Anda memiliki 5 pemilik latex yang di-assign.", type: "success" },
+  ];
+
+  for (const n of notifs) {
+    await pool.query(
+      `INSERT INTO public.notifications (user_id, title, message, type) VALUES ($1, $2, $3, $4)`,
+      [n.userId, n.title, n.message, n.type]
+    );
+  }
+
   await seedMeasurements(users.map((u) => u.id));
 
   const counts = await pool.query<{
     users: string;
     profiles: string;
     measurements: string;
+    notifications: string;
+    farmer_owners: string;
   }>(
     `
     SELECT
       (SELECT count(*)::text FROM public.users) as users,
       (SELECT count(*)::text FROM public.profiles) as profiles,
-      (SELECT count(*)::text FROM public.latex_measurements) as measurements
+      (SELECT count(*)::text FROM public.latex_measurements) as measurements,
+      (SELECT count(*)::text FROM public.notifications) as notifications,
+      (SELECT count(*)::text FROM public.farmer_owners) as farmer_owners
     `
   );
 
   console.log("Seed done.");
-  console.log("Demo login:", "demo@latexguard.local / demo12345");
+  console.log("Admin login: demo@latexguard.local / demo12345");
+  console.log("Petani login: petani1@latexguard.local / petani123");
+  console.log("            : petani2@latexguard.local / petani123");
+  console.log("            : petani3@latexguard.local / petani123");
   console.log("Counts:", counts.rows[0]);
 }
 
@@ -164,4 +227,3 @@ main()
   .finally(async () => {
     await pool.end();
   });
-

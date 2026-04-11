@@ -1,6 +1,7 @@
-import { LayoutDashboard, BarChart3, UserCircle, Settings, LogOut, Droplets, Cpu, Users } from "lucide-react";
+import { LayoutDashboard, BarChart3, UserCircle, LogOut, Droplets, Cpu, Users, Shield, Bell } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/use-auth";
+import { useNotifications } from "@/hooks/use-notifications";
 import { useNavigate } from "react-router-dom";
 import {
   Sidebar,
@@ -20,6 +21,7 @@ const menuItems = [
   { title: "Riwayat Data", url: "/measurements", icon: BarChart3 },
   { title: "Device Status", url: "/devices", icon: Cpu },
   { title: "Pemilik Latex", url: "/owners", icon: Users },
+  { title: "Kelola Pengguna", url: "/admin/users", icon: Shield },
   { title: "Profil Pengguna", url: "/profile", icon: UserCircle },
 ];
 
@@ -27,6 +29,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { signOut } = useAuth();
+  const { unreadCount } = useNotifications();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -44,7 +47,7 @@ export function AppSidebar() {
           {!collapsed && (
             <div className="animate-slide-in">
               <h1 className="text-sm font-bold text-sidebar-foreground">LatexGuard</h1>
-              <p className="text-[10px] text-sidebar-foreground/60">IoT Monitoring System</p>
+              <p className="text-[10px] text-sidebar-foreground/60">Admin Panel</p>
             </div>
           )}
         </div>

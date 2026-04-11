@@ -1,14 +1,27 @@
 import { Navigate } from "react-router-dom";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, type UserRole } from "@/hooks/use-auth";
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  allowedRoles?: UserRole[];
+}
+
+export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
 
   if (loading) {
-    // Return blank screen instead of spinner during < 200ms auth check
     return <div className="min-h-screen bg-background" />;
   }
 
   if (!user) return <Navigate to="/login" replace />;
+
+  // Role-based redirect
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    if (user.role === "petani") {
+      return <Navigate to="/farmer" replace />;
+    }
+    return <Navigate to="/" replace />;
+  }
+
   return <>{children}</>;
 }

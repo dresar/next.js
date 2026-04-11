@@ -3,14 +3,22 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { Bell, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/use-theme";
-import { useEffect } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { useNotifications } from "@/hooks/use-notifications";
+import { useEffect, useState, useRef } from "react";
 import { subscribeRealtime } from "@/lib/realtime";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import { MqttOwnerPopup } from "@/components/MqttOwnerPopup";
+import { useNavigate } from "react-router-dom";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
+  const { unreadCount, notifications } = useNotifications();
+  const navigate = useNavigate();
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let offlineAfterSeconds = 60;
@@ -70,6 +78,19 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const initials = user?.email?.slice(0, 2).toUpperCase() ?? "AD";
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
@@ -87,12 +108,59 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <Button variant="ghost" size="icon" onClick={toggleTheme} className="text-muted-foreground hover:text-foreground">
                 {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
-              <Button variant="ghost" size="icon" className="relative text-muted-foreground">
-                <Bell className="h-4 w-4" />
-                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive" />
-              </Button>
+
+              {/* Notification Bell with Dropdown */}
+              <div className="relative" ref={dropdownRef}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative text-muted-foreground"
+                  onClick={() => setShowDropdown(!showDropdown)}
+                >
+                  <Bell className="h-4 w-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 h-4 w-4 rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground flex items-center justify-center animate-pulse">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </Button>
+
+                {/* Dropdown */}
+                {showDropdown && (
+                  <div className="absolute right-0 top-10 w-72 sm:w-80 rounded-xl border bg-card shadow-xl z-50 overflow-hidden animate-fade-in">
+                    <div className="p-3 border-b bg-muted/20 flex items-center justify-between">
+                      <span className="text-xs font-semibold">Notifikasi</span>
+                      <span className="text-[10px] text-muted-foreground">{unreadCount} belum dibaca</span>
+                    </div>
+                    <div className="max-h-64 overflow-auto divide-y">
+                      {notifications.slice(0, 5).map(n => (
+                        <div
+                          key={n.id}
+                          className={`p-3 text-xs space-y-0.5 ${n.is_read ? "" : "bg-primary/5"}`}
+                        >
+                          <p className="font-semibold text-foreground truncate">{n.title}</p>
+                          <p className="text-muted-foreground line-clamp-2">{n.message}</p>
+                          <p className="text-[10px] text-muted-foreground/50">{new Date(n.created_at).toLocaleString("id-ID")}</p>
+                        </div>
+                      ))}
+                      {notifications.length === 0 && (
+                        <div className="p-4 text-xs text-muted-foreground text-center">Belum ada notifikasi</div>
+                      )}
+                    </div>
+                    <div className="p-2 border-t bg-muted/10">
+                      <button
+                        onClick={() => { setShowDropdown(false); navigate("/notifications"); }}
+                        className="w-full text-center text-xs text-primary font-medium py-1.5 rounded-lg hover:bg-primary/5 transition-colors"
+                      >
+                        Lihat Semua Notifikasi
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary">
-                AD
+                {initials}
               </div>
             </div>
           </header>

@@ -16,3 +16,12 @@ export function requireAuth(req: AuthedRequest, res: Response, next: NextFunctio
   }
 }
 
+export function requireRole(...roles: string[]) {
+  return (req: AuthedRequest, res: Response, next: NextFunction) => {
+    if (!req.auth) return res.status(401).json({ error: "Not authenticated" });
+    if (!roles.includes(req.auth.role)) {
+      return res.status(403).json({ error: "Akses ditolak. Role tidak memiliki izin." });
+    }
+    return next();
+  };
+}
