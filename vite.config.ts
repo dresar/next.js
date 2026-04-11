@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => ({
     },
     proxy: {
       "/api": {
-        target: "http://localhost:3007",
+        target: "http://localhost:3001",
         changeOrigin: true,
         ws: true,
       },
