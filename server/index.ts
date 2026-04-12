@@ -154,6 +154,13 @@ app.put("/api/profile", requireAuth, async (req: AuthedRequest, res) => {
   const phone = body.data.phone ?? null;
   const address = body.data.address ?? null;
 
+  // Ambil nama lama sebelum update (untuk sinkronisasi owner name)
+  const oldProfileRes = await pool.query<{ full_name: string | null }>(
+    `SELECT full_name FROM public.profiles WHERE user_id = $1 LIMIT 1`,
+    [auth.id]
+  );
+  const oldName = oldProfileRes.rows[0]?.full_name ?? null;
+
   await pool.query(
     `
     INSERT INTO public.profiles (user_id, full_name, phone, address)
@@ -165,6 +172,25 @@ app.put("/api/profile", requireAuth, async (req: AuthedRequest, res) => {
     `,
     [auth.id, fullName, phone, address]
   );
+
+  // Sinkronisasi: jika nama berubah DAN user adalah petani, update juga di tabel owner
+  if (fullName && oldName && fullName !== oldName && auth.role === "petani") {
+    // 1. Update farmer_owners (assignment petani → pemilik)
+    await pool.query(
+      `UPDATE public.farmer_owners SET owner_name = $1 WHERE user_id = $2 AND owner_name = $3`,
+      [fullName, auth.id, oldName]
+    );
+    // 2. Update latex_owners (registry pemilik di admin)
+    await pool.query(
+      `UPDATE public.latex_owners SET name = $1 WHERE name = $2`,
+      [fullName, oldName]
+    );
+    // 3. Update latex_measurements (riwayat pengukuran)
+    await pool.query(
+      `UPDATE public.latex_measurements SET owner_name = $1 WHERE owner_name = $2 AND user_id = $3`,
+      [fullName, oldName, auth.id]
+    );
+  }
 
   return res.json({ ok: true });
 });

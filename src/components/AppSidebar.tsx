@@ -1,4 +1,4 @@
-import { LayoutDashboard, BarChart3, UserCircle, LogOut, Droplets, Cpu, Users, Shield, Bell } from "lucide-react";
+import { LayoutDashboard, BarChart3, UserCircle, LogOut, Droplets, Cpu, Users, Shield, Bell, BookOpen } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/use-auth";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -17,12 +17,13 @@ import {
 } from "@/components/ui/sidebar";
 
 const menuItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Riwayat Data", url: "/measurements", icon: BarChart3 },
-  { title: "Device Status", url: "/devices", icon: Cpu },
-  { title: "Pemilik Latex", url: "/owners", icon: Users },
+  { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
+  { title: "Riwayat Data", url: "/admin/measurements", icon: BarChart3 },
+  { title: "Device Status", url: "/admin/devices", icon: Cpu },
+  { title: "Pemilik Latex", url: "/admin/owners", icon: Users },
   { title: "Kelola Pengguna", url: "/admin/users", icon: Shield },
-  { title: "Profil Pengguna", url: "/profile", icon: UserCircle },
+  { title: "Dokumentasi", url: "/admin/docs", icon: BookOpen },
+  { title: "Profil Pengguna", url: "/admin/profile", icon: UserCircle },
 ];
 
 export function AppSidebar() {
@@ -62,7 +63,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
-                      end={item.url === "/"}
+                      end={item.url === "/admin"}
                       className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm text-sidebar-foreground transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:translate-x-0.5"
                       activeClassName="bg-sidebar-accent text-sidebar-primary font-medium shadow-sm"
                     >

@@ -2,23 +2,21 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 // Admin pages
 import Dashboard from "./pages/Dashboard";
 import Measurements from "./pages/Measurements";
-import AnalyticsPage from "./pages/AnalyticsPage";
 import Profile from "./pages/Profile";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import DeviceMonitoring from "./pages/DeviceMonitoring";
-import DataLogger from "./pages/DataLogger";
-import OtaMonitor from "./pages/OtaMonitor";
 import OwnersPage from "./pages/OwnersPage";
 import AdminUsers from "./pages/AdminUsers";
 import AdminNotifications from "./pages/AdminNotifications";
+import DocumentationPage from "./pages/DocumentationPage";
 
 // Farmer pages
 import FarmerDashboard from "./pages/farmer/FarmerDashboard";
@@ -39,17 +37,23 @@ const App = () => (
             {/* Public */}
             <Route path="/login" element={<Login />} />
 
-            {/* Admin Routes */}
-            <Route path="/" element={<ProtectedRoute allowedRoles={["admin"]}><Dashboard /></ProtectedRoute>} />
-            <Route path="/measurements" element={<ProtectedRoute allowedRoles={["admin"]}><Measurements /></ProtectedRoute>} />
-            <Route path="/devices" element={<ProtectedRoute allowedRoles={["admin"]}><DeviceMonitoring /></ProtectedRoute>} />
-            <Route path="/data-logger" element={<ProtectedRoute allowedRoles={["admin"]}><DataLogger /></ProtectedRoute>} />
-            <Route path="/ota" element={<ProtectedRoute allowedRoles={["admin"]}><OtaMonitor /></ProtectedRoute>} />
-            <Route path="/owners" element={<ProtectedRoute allowedRoles={["admin"]}><OwnersPage /></ProtectedRoute>} />
-            <Route path="/analytics" element={<ProtectedRoute allowedRoles={["admin"]}><AnalyticsPage /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute allowedRoles={["admin"]}><Profile /></ProtectedRoute>} />
+            {/* Admin Routes — semua pakai /admin/ prefix */}
+            <Route path="/admin" element={<ProtectedRoute allowedRoles={["admin"]}><Dashboard /></ProtectedRoute>} />
+            <Route path="/admin/measurements" element={<ProtectedRoute allowedRoles={["admin"]}><Measurements /></ProtectedRoute>} />
+            <Route path="/admin/devices" element={<ProtectedRoute allowedRoles={["admin"]}><DeviceMonitoring /></ProtectedRoute>} />
+            <Route path="/admin/owners" element={<ProtectedRoute allowedRoles={["admin"]}><OwnersPage /></ProtectedRoute>} />
             <Route path="/admin/users" element={<ProtectedRoute allowedRoles={["admin"]}><AdminUsers /></ProtectedRoute>} />
-            <Route path="/notifications" element={<ProtectedRoute allowedRoles={["admin"]}><AdminNotifications /></ProtectedRoute>} />
+            <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={["admin"]}><AdminNotifications /></ProtectedRoute>} />
+            <Route path="/admin/profile" element={<ProtectedRoute allowedRoles={["admin"]}><Profile /></ProtectedRoute>} />
+            <Route path="/admin/docs" element={<ProtectedRoute allowedRoles={["admin"]}><DocumentationPage /></ProtectedRoute>} />
+
+            {/* Backward compatibility — redirect old paths to /admin/ */}
+            <Route path="/" element={<Navigate to="/admin" replace />} />
+            <Route path="/measurements" element={<Navigate to="/admin/measurements" replace />} />
+            <Route path="/devices" element={<Navigate to="/admin/devices" replace />} />
+            <Route path="/owners" element={<Navigate to="/admin/owners" replace />} />
+            <Route path="/profile" element={<Navigate to="/admin/profile" replace />} />
+            <Route path="/notifications" element={<Navigate to="/admin/notifications" replace />} />
 
             {/* Farmer Routes */}
             <Route path="/farmer" element={<ProtectedRoute allowedRoles={["petani"]}><FarmerDashboard /></ProtectedRoute>} />

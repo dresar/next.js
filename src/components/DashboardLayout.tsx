@@ -149,7 +149,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="p-2 border-t bg-muted/10">
                       <button
-                        onClick={() => { setShowDropdown(false); navigate("/notifications"); }}
+                        onClick={() => { setShowDropdown(false); navigate("/admin/notifications"); }}
                         className="w-full text-center text-xs text-primary font-medium py-1.5 rounded-lg hover:bg-primary/5 transition-colors"
                       >
                         Lihat Semua Notifikasi

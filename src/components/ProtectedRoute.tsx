@@ -20,7 +20,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     if (user.role === "petani") {
       return <Navigate to="/farmer" replace />;
     }
-    return <Navigate to="/" replace />;
+    return <Navigate to="/admin" replace />;
   }
 
   return <>{children}</>;

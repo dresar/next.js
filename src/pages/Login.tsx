@@ -29,7 +29,7 @@ const Login = () => {
 
   const redirectByRole = (role: string) => {
     if (role === "petani") navigate("/farmer");
-    else navigate("/");
+    else navigate("/admin");
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -68,7 +68,7 @@ const Login = () => {
       if (type === "admin") {
         await demoLogin();
         prefetchMeasurements().catch(console.error);
-        navigate("/");
+        navigate("/admin");
       } else {
         await demoLoginPetani();
         // Prefetch SEMUA data petani sebelum navigasi — zero loading di farmer page
