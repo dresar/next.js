@@ -113,10 +113,10 @@ export function FarmerLayout({ children }: { children: React.ReactNode }) {
 
       {/* Content Area */}
       <div className="flex flex-1 min-h-0">
-        {/* Desktop Sidebar */}
+        {/* Desktop Sidebar — sticky, tidak ikut scroll */}
         {!isMobile && (
-          <aside className="hidden lg:flex w-56 flex-col border-r bg-card/30 backdrop-blur-sm">
-            <nav className="flex-1 p-3 space-y-1">
+          <aside className="hidden lg:flex w-56 flex-col border-r bg-card/30 backdrop-blur-sm sticky top-14 h-[calc(100vh-3.5rem)] shrink-0">
+            <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
               {navItems.map((item) => {
                 const active = location.pathname === item.path;
                 return (
@@ -152,7 +152,7 @@ export function FarmerLayout({ children }: { children: React.ReactNode }) {
           </aside>
         )}
 
-        {/* Main Content */}
+        {/* Main Content — scrollable */}
         <main className={`flex-1 overflow-auto ${isMobile ? "pb-20" : ""}`}>
           <div className="p-3 sm:p-4 md:p-6">
             {children}

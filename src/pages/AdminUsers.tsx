@@ -8,7 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Search, Shield, Leaf, Trash2, Bell, UserPlus, Link2, Users } from "lucide-react";
+import { Search, Shield, Leaf, Trash2, Bell, Users } from "lucide-react";
 import { motion } from "framer-motion";
 
 type UserRow = {
@@ -21,19 +21,8 @@ type UserRow = {
   address: string | null;
 };
 
-type FarmerOwnerRow = {
-  id: string;
-  user_id: string;
-  owner_name: string;
-  email: string;
-  full_name: string | null;
-  created_at: string;
-};
-
 export default function AdminUsers() {
   const [users, setUsers] = useState<UserRow[]>([]);
-  const [farmerOwners, setFarmerOwners] = useState<FarmerOwnerRow[]>([]);
-  const [owners, setOwners] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [loadingUsers, setLoadingUsers] = useState(true);
@@ -46,20 +35,11 @@ export default function AdminUsers() {
   const [notifyForm, setNotifyForm] = useState({ title: "", message: "", type: "info" });
   const [sending, setSending] = useState(false);
 
-  const [assignUser, setAssignUser] = useState<UserRow | null>(null);
-  const [assignOwner, setAssignOwner] = useState("");
-
   const fetchAll = useCallback(async () => {
     setLoadingUsers(true);
     try {
-      const [u, fo, o] = await Promise.all([
-        apiFetch<UserRow[]>("/api/admin/users"),
-        apiFetch<FarmerOwnerRow[]>("/api/admin/farmer-owners"),
-        apiFetch<string[]>("/api/owners"),
-      ]);
+      const u = await apiFetch<UserRow[]>("/api/admin/users");
       setUsers(u);
-      setFarmerOwners(fo);
-      setOwners(o);
     } catch (err) {
       toast.error("Gagal memuat data pengguna");
     }
@@ -131,35 +111,6 @@ export default function AdminUsers() {
     setSending(false);
   };
 
-  const handleAssign = async () => {
-    if (!assignUser || !assignOwner) {
-      toast.error("Pilih pemilik latex");
-      return;
-    }
-    try {
-      await apiFetch("/api/admin/farmer-owners", {
-        method: "POST",
-        body: JSON.stringify({ user_id: assignUser.id, owner_name: assignOwner }),
-      });
-      toast.success("Pemilik latex berhasil di-assign!");
-      setAssignUser(null);
-      setAssignOwner("");
-      fetchAll();
-    } catch (err) {
-      toast.error((err as { message?: string })?.message ?? "Gagal assign");
-    }
-  };
-
-  const handleRemoveAssign = async (foId: string) => {
-    try {
-      await apiFetch(`/api/admin/farmer-owners/${foId}`, { method: "DELETE" });
-      toast.success("Assignment dihapus");
-      setFarmerOwners(prev => prev.filter(fo => fo.id !== foId));
-    } catch (err) {
-      toast.error("Gagal menghapus assignment");
-    }
-  };
-
   return (
     <DashboardLayout>
       <div className="space-y-4 sm:space-y-6">
@@ -168,7 +119,7 @@ export default function AdminUsers() {
             <Users className="h-5 w-5 text-primary" />
             Kelola Pengguna
           </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground">Atur role user, assign owner ke petani, kirim notifikasi</p>
+          <p className="text-xs sm:text-sm text-muted-foreground">Atur role user dan kirim notifikasi</p>
         </div>
 
         {/* Filters */}
@@ -218,11 +169,6 @@ export default function AdminUsers() {
                   </button>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {u.role === "petani" && (
-                    <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1 px-2" onClick={() => { setAssignUser(u); setAssignOwner(""); }}>
-                      <Link2 className="h-3 w-3" /> Assign
-                    </Button>
-                  )}
                   <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1 px-2" onClick={() => { setNotifyUser(u); setNotifyForm({ title: "", message: "", type: "info" }); }}>
                     <Bell className="h-3 w-3" /> Notif
                   </Button>
@@ -230,17 +176,6 @@ export default function AdminUsers() {
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>
-                {/* Show assigned owners for this petani */}
-                {u.role === "petani" && (
-                  <div className="flex flex-wrap gap-1">
-                    {farmerOwners.filter(fo => fo.user_id === u.id).map(fo => (
-                      <span key={fo.id} className="inline-flex items-center gap-1 text-[10px] bg-muted px-2 py-0.5 rounded-full">
-                        {fo.owner_name}
-                        <button onClick={() => handleRemoveAssign(fo.id)} className="text-muted-foreground hover:text-destructive">×</button>
-                      </span>
-                    ))}
-                  </div>
-                )}
               </motion.div>
             ))}
           </div>
@@ -253,9 +188,8 @@ export default function AdminUsers() {
                   <th className="p-3 text-left font-medium text-muted-foreground">Nama</th>
                   <th className="p-3 text-left font-medium text-muted-foreground">Email</th>
                   <th className="p-3 text-left font-medium text-muted-foreground">Role</th>
-                  <th className="p-3 text-left font-medium text-muted-foreground">Owner Assigned</th>
                   <th className="p-3 text-left font-medium text-muted-foreground">Tanggal Daftar</th>
-                  <th className="p-3 text-left font-medium text-muted-foreground w-40">Aksi</th>
+                  <th className="p-3 text-left font-medium text-muted-foreground w-32">Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -276,25 +210,9 @@ export default function AdminUsers() {
                         {u.role}
                       </button>
                     </td>
-                    <td className="p-3">
-                      <div className="flex flex-wrap gap-1">
-                        {farmerOwners.filter(fo => fo.user_id === u.id).map(fo => (
-                          <span key={fo.id} className="inline-flex items-center gap-1 text-[10px] bg-muted px-2 py-0.5 rounded-full">
-                            {fo.owner_name}
-                            <button onClick={() => handleRemoveAssign(fo.id)} className="text-muted-foreground hover:text-destructive">×</button>
-                          </span>
-                        ))}
-                        {u.role !== "petani" && <span className="text-xs text-muted-foreground">—</span>}
-                      </div>
-                    </td>
                     <td className="p-3 text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString("id-ID")}</td>
                     <td className="p-3">
                       <div className="flex items-center gap-1">
-                        {u.role === "petani" && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8" title="Assign Owner" onClick={() => { setAssignUser(u); setAssignOwner(""); }}>
-                            <Link2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
                         <Button variant="ghost" size="icon" className="h-8 w-8" title="Kirim Notifikasi" onClick={() => { setNotifyUser(u); setNotifyForm({ title: "", message: "", type: "info" }); }}>
                           <Bell className="h-3.5 w-3.5" />
                         </Button>
@@ -345,36 +263,6 @@ export default function AdminUsers() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setNotifyUser(null)}>Batal</Button>
               <Button onClick={handleNotify} disabled={sending}>{sending ? "Mengirim..." : "Kirim Notifikasi"}</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Dialog: Assign Owner */}
-        <Dialog open={!!assignUser} onOpenChange={(o) => !o && setAssignUser(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Assign Pemilik Latex ke {assignUser?.full_name || assignUser?.email}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Pilih Pemilik Latex</Label>
-                <Select value={assignOwner} onValueChange={setAssignOwner}>
-                  <SelectTrigger><SelectValue placeholder="Pilih pemilik..." /></SelectTrigger>
-                  <SelectContent>
-                    {owners.filter(o => o && o.toLowerCase() !== "unknown").map(o => (
-                      <SelectItem key={o} value={o}>{o}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Owner yang sudah di-assign:{" "}
-                {farmerOwners.filter(fo => fo.user_id === assignUser?.id).map(fo => fo.owner_name).join(", ") || "Belum ada"}
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setAssignUser(null)}>Batal</Button>
-              <Button onClick={handleAssign}>Assign</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

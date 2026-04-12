@@ -8,7 +8,7 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import { motion } from "framer-motion";
-import { getFarmerCache, prefetchAllFarmerData, updateFarmerCache, type OwnerAssignment } from "@/hooks/use-farmer-cache";
+import { getFarmerCache, prefetchAllFarmerData, updateFarmerCache } from "@/hooks/use-farmer-cache";
 
 export default function FarmerProfile() {
   const { user } = useAuth();
@@ -22,7 +22,6 @@ export default function FarmerProfile() {
   });
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [myOwners, setMyOwners] = useState<OwnerAssignment[]>(cached?.myOwners ?? []);
 
   // Fallback: jika cache belum ada (user refresh browser langsung ke /farmer/profile)
   useEffect(() => {
@@ -35,7 +34,6 @@ export default function FarmerProfile() {
         phone: data.profile.phone || "",
         address: data.profile.address || "",
       });
-      setMyOwners(data.myOwners);
     }).catch(() => {});
   }, [user]);
 
@@ -163,36 +161,6 @@ export default function FarmerProfile() {
           <Button onClick={handleSave} disabled={loading} className="w-full sm:w-auto h-9 text-sm">
             {loading ? "Menyimpan..." : "Simpan Perubahan"}
           </Button>
-        </motion.div>
-
-        {/* Assigned Owners */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="rounded-xl border bg-card overflow-hidden"
-        >
-          <div className="p-4 border-b bg-muted/20 flex items-center gap-2">
-            <Leaf className="h-4 w-4 text-green-500" />
-            <h3 className="text-sm font-semibold">Pemilik Latex Saya</h3>
-            <span className="ml-auto text-xs text-muted-foreground">{myOwners.length} pemilik</span>
-          </div>
-          {myOwners.length === 0 ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">
-              Belum ada pemilik latex yang di-assign. Hubungi admin.
-            </div>
-          ) : (
-            <div className="divide-y">
-              {myOwners.map((o) => (
-                <div key={o.id} className="px-4 py-3 flex items-center justify-between">
-                  <span className="text-sm font-medium">{o.owner_name}</span>
-                  <span className="text-[10px] text-muted-foreground">
-                    Sejak {new Date(o.created_at).toLocaleDateString("id-ID")}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
         </motion.div>
       </div>
     </FarmerLayout>
