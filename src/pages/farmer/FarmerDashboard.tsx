@@ -1,33 +1,14 @@
 import { FarmerLayout } from "@/components/FarmerLayout";
 import { useAuth } from "@/hooks/use-auth";
 import { useNotifications } from "@/hooks/use-notifications";
-import { apiFetch } from "@/lib/api";
+import { getFarmerCache, prefetchAllFarmerData, type FarmerStats, type FarmerMeasurement } from "@/hooks/use-farmer-cache";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Droplets, Waves, Thermometer, ShieldCheck, TrendingUp, Users, AlertTriangle, Bell } from "lucide-react";
+import { Droplets, Waves, Thermometer, ShieldCheck, TrendingUp, AlertTriangle, Bell, Activity } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { StatusBadge } from "@/components/StatusBadge";
 import { classifyLatex, statusToColor } from "@/lib/latex-utils";
 import { useNavigate } from "react-router-dom";
-
-type FarmerStats = {
-  total_owners: number;
-  total_measurements: number;
-  avg_ph: number | null;
-  latest_quality: string | null;
-  measurements_this_month: number;
-};
-
-type MeasurementRow = {
-  id: string;
-  owner_name: string;
-  ph_value: number | null;
-  tds_value: number;
-  temperature: number;
-  quality_status: string;
-  created_at: string;
-  device_id: string | null;
-};
 
 const cardVariants = {
   hidden: { opacity: 0, y: 12 },
@@ -42,25 +23,25 @@ export default function FarmerDashboard() {
   const { user } = useAuth();
   const { notifications, unreadCount } = useNotifications();
   const navigate = useNavigate();
-  const [stats, setStats] = useState<FarmerStats | null>(null);
-  const [measurements, setMeasurements] = useState<MeasurementRow[]>([]);
-  const [profileName, setProfileName] = useState("");
-  const [loading, setLoading] = useState(true);
 
+  // Ambil data dari cache global — sudah diprefetch saat login, TIDAK ADA loading
+  const cached = getFarmerCache();
+  const [stats, setStats] = useState<FarmerStats | null>(cached?.stats ?? null);
+  const [measurements, setMeasurements] = useState<FarmerMeasurement[]>(cached?.measurements ?? []);
+  const [profileName, setProfileName] = useState(cached?.profile?.full_name ?? "");
+
+  // Fallback: jika cache belum ada (misalnya user refresh browser langsung ke /farmer),
+  // fetch di background TANPA menampilkan loading spinner
   useEffect(() => {
+    if (cached) return; // Sudah ada dari login prefetch
+
     let cancelled = false;
-    Promise.all([
-      apiFetch<FarmerStats>("/api/farmer/stats"),
-      apiFetch<MeasurementRow[]>("/api/measurements?limit=30"),
-      apiFetch<{ full_name: string | null }>("/api/profile"),
-    ]).then(([s, m, p]) => {
+    prefetchAllFarmerData().then((data) => {
       if (cancelled) return;
-      setStats(s);
-      setMeasurements(m);
-      setProfileName(p.full_name ?? "");
-    }).catch(() => {}).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
+      setStats(data.stats);
+      setMeasurements(data.measurements);
+      setProfileName(data.profile.full_name ?? "");
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
@@ -86,19 +67,7 @@ export default function FarmerDashboard() {
     return "Selamat Malam";
   }, []);
 
-  if (loading) {
-    return (
-      <FarmerLayout>
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center space-y-3">
-            <div className="h-10 w-10 mx-auto rounded-full border-2 border-primary border-t-transparent animate-spin" />
-            <p className="text-sm text-muted-foreground">Memuat dashboard...</p>
-          </div>
-        </div>
-      </FarmerLayout>
-    );
-  }
-
+  // TIDAK ADA loading spinner — langsung tampilkan konten
   return (
     <FarmerLayout>
       <div className="space-y-4 sm:space-y-6">
@@ -119,7 +88,7 @@ export default function FarmerDashboard() {
                 {profileName || user?.email?.split("@")[0] || "Petani"}
               </h1>
               <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
-                {stats?.total_owners ?? 0} pemilik latex • {stats?.measurements_this_month ?? 0} pengukuran bulan ini
+                {stats?.total_measurements ?? 0} total pengukuran • {stats?.measurements_this_month ?? 0} bulan ini
               </p>
             </div>
           </div>
@@ -153,7 +122,7 @@ export default function FarmerDashboard() {
         )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
           {[
             {
               title: "Pengukuran Bulan Ini",
@@ -176,13 +145,6 @@ export default function FarmerDashboard() {
               color: stats?.latest_quality?.includes("Prima") ? "text-green-500" : "text-amber-500",
               bg: stats?.latest_quality?.includes("Prima") ? "bg-green-500/10" : "bg-amber-500/10",
               small: true,
-            },
-            {
-              title: "Pemilik Latex",
-              value: stats?.total_owners ?? 0,
-              icon: Users,
-              color: "text-purple-500",
-              bg: "bg-purple-500/10",
             },
           ].map((card, i) => (
             <motion.div
@@ -269,7 +231,6 @@ export default function FarmerDashboard() {
                 {measurements.slice(0, 5).map((m) => (
                   <div key={m.id} className="p-3 space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium truncate flex-1">{m.owner_name}</span>
                       <StatusBadge status={m.quality_status} color={statusToColor(m.quality_status)} />
                     </div>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -289,7 +250,7 @@ export default function FarmerDashboard() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/10">
-                      <th className="p-3 text-left font-medium text-muted-foreground">Pemilik</th>
+                      <th className="p-3 text-left font-medium text-muted-foreground">#</th>
                       <th className="p-3 text-left font-medium text-muted-foreground">pH</th>
                       <th className="p-3 text-left font-medium text-muted-foreground">TDS</th>
                       <th className="p-3 text-left font-medium text-muted-foreground">Suhu</th>
@@ -298,9 +259,9 @@ export default function FarmerDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {measurements.slice(0, 5).map((m) => (
+                    {measurements.slice(0, 5).map((m, i) => (
                       <tr key={m.id} className="border-b border-border/30 hover:bg-muted/20 transition-colors">
-                        <td className="p-3 font-medium">{m.owner_name}</td>
+                        <td className="p-3 text-muted-foreground">{i + 1}</td>
                         <td className="p-3 font-mono">{m.ph_value != null ? Number(m.ph_value).toFixed(2) : "—"}</td>
                         <td className="p-3 font-mono">{m.tds_value} ppm</td>
                         <td className="p-3 font-mono">{Number(m.temperature).toFixed(1)}°C</td>

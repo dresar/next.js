@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { apiFetch, setToken } from "@/lib/api";
 import { reconnectRealtime } from "@/lib/realtime";
+import { clearFarmerCache } from "@/hooks/use-farmer-cache";
 
 export type UserRole = "admin" | "petani";
 
@@ -66,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     setToken(null);
     setUser(null);
+    clearFarmerCache();
     reconnectRealtime();
   };
 

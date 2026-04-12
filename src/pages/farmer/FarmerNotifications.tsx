@@ -38,11 +38,7 @@ export default function FarmerNotifications() {
 
         {/* Notification List */}
         <div className="space-y-2">
-          {loading ? (
-            <div className="p-8 text-center">
-              <div className="h-8 w-8 mx-auto rounded-full border-2 border-primary border-t-transparent animate-spin" />
-            </div>
-          ) : notifications.length === 0 ? (
+          {notifications.length === 0 ? (
             <div className="rounded-xl border bg-card p-8 text-center">
               <BellOff className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
               <p className="text-sm text-muted-foreground">Belum ada notifikasi</p>

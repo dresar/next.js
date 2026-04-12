@@ -8,36 +8,35 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api";
 import { motion } from "framer-motion";
-
-type OwnerAssignment = {
-  id: string;
-  owner_name: string;
-  created_at: string;
-};
+import { getFarmerCache, prefetchAllFarmerData, updateFarmerCache, type OwnerAssignment } from "@/hooks/use-farmer-cache";
 
 export default function FarmerProfile() {
   const { user } = useAuth();
-  const [profile, setProfile] = useState({ full_name: "", phone: "", address: "" });
+
+  // Ambil data dari cache global — sudah diprefetch saat login, TIDAK ADA loading
+  const cached = getFarmerCache();
+  const [profile, setProfile] = useState({
+    full_name: cached?.profile?.full_name ?? "",
+    phone: cached?.profile?.phone ?? "",
+    address: cached?.profile?.address ?? "",
+  });
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [myOwners, setMyOwners] = useState<OwnerAssignment[]>([]);
+  const [myOwners, setMyOwners] = useState<OwnerAssignment[]>(cached?.myOwners ?? []);
 
+  // Fallback: jika cache belum ada (user refresh browser langsung ke /farmer/profile)
   useEffect(() => {
-    let cancelled = false;
+    if (cached) return;
     if (!user) return;
-    Promise.all([
-      apiFetch<{ full_name: string | null; phone: string | null; address: string | null }>("/api/profile"),
-      apiFetch<OwnerAssignment[]>("/api/farmer/my-owners"),
-    ]).then(([p, o]) => {
-      if (cancelled) return;
+
+    prefetchAllFarmerData().then((data) => {
       setProfile({
-        full_name: p.full_name || "",
-        phone: p.phone || "",
-        address: p.address || "",
+        full_name: data.profile.full_name || "",
+        phone: data.profile.phone || "",
+        address: data.profile.address || "",
       });
-      setMyOwners(o);
+      setMyOwners(data.myOwners);
     }).catch(() => {});
-    return () => { cancelled = true; };
   }, [user]);
 
   const handleSave = async () => {
@@ -53,6 +52,15 @@ export default function FarmerProfile() {
         }),
       });
       toast.success("Profil berhasil disimpan!");
+
+      // Update cache agar halaman lain langsung pakai data baru
+      updateFarmerCache({
+        profile: {
+          full_name: profile.full_name || null,
+          phone: profile.phone || null,
+          address: profile.address || null,
+        },
+      });
 
       if (newPassword) {
         await apiFetch("/api/profile/password", {

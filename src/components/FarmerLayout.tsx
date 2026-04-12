@@ -8,8 +8,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useEffect, useState } from "react";
 import { subscribeRealtime } from "@/lib/realtime";
 import { toast } from "sonner";
-import { apiFetch } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
+import { getFarmerCache, prefetchAllFarmerData } from "@/hooks/use-farmer-cache";
 
 const navItems = [
   { title: "Beranda", path: "/farmer", icon: Home },
@@ -27,13 +27,21 @@ export function FarmerLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Profile name
-  const [profileName, setProfileName] = useState<string>("");
+  // Profile name — langsung dari cache, tanpa API call tambahan
+  const cached = getFarmerCache();
+  const [profileName, setProfileName] = useState<string>(cached?.profile?.full_name ?? "");
   useEffect(() => {
-    apiFetch<{ full_name: string | null }>("/api/profile")
-      .then(p => setProfileName(p.full_name ?? ""))
-      .catch(() => {});
-  }, []);
+    // Update jika cache berubah (misal setelah prefetch selesai di background)
+    const cached = getFarmerCache();
+    if (cached?.profile?.full_name) {
+      setProfileName(cached.profile.full_name);
+    } else if (!cached) {
+      // Fallback: jika belum ada cache (direct browser refresh)
+      prefetchAllFarmerData()
+        .then(data => setProfileName(data.profile.full_name ?? ""))
+        .catch(() => {});
+    }
+  }, [location.pathname]); // Re-check saat pindah halaman
 
   const handleLogout = async () => {
     await signOut();

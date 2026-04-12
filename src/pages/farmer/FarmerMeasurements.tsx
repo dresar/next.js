@@ -1,27 +1,15 @@
 import { FarmerLayout } from "@/components/FarmerLayout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { type StatusColor } from "@/lib/latex-utils";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Download, ChevronLeft, ChevronRight, BarChart3 } from "lucide-react";
+import { Download, ChevronLeft, ChevronRight, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-
-type MeasurementRow = {
-  id: string;
-  owner_name: string;
-  ph_value: number | null;
-  tds_value: number;
-  temperature: number;
-  quality_status: string;
-  latitude: number | null;
-  longitude: number | null;
-  created_at: string;
-  device_id: string | null;
-};
+import { getFarmerCache, prefetchAllFarmerData, type FarmerMeasurement } from "@/hooks/use-farmer-cache";
 
 const PER_PAGE = 15;
 
@@ -33,36 +21,49 @@ function statusToColor(status: string): StatusColor {
 }
 
 export default function FarmerMeasurements() {
-  const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [rows, setRows] = useState<MeasurementRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
 
-  const fetchRows = async () => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (search) params.set("owner", search);
-    if (statusFilter && statusFilter !== "all") params.set("quality_status", statusFilter);
-    if (fromDate) params.set("from", fromDate);
-    if (toDate) params.set("to", toDate);
-    params.set("limit", "1000");
+  // Ambil data dari cache global — sudah diprefetch saat login, TIDAK ADA loading
+  const cached = getFarmerCache();
+  const [allRows, setAllRows] = useState<FarmerMeasurement[]>(cached?.measurements ?? []);
+  const [profileName, setProfileName] = useState<string>(cached?.profile?.full_name ?? "");
 
-    try {
-      const data = await apiFetch<MeasurementRow[]>(`/api/measurements?${params.toString()}`);
-      setRows(data.filter((m) => m.owner_name !== "Unknown"));
-    } catch (err) {
-      toast.error((err as { message?: string })?.message ?? "Gagal memuat data");
+  // Fallback: jika cache belum ada (user refresh browser langsung ke /farmer/data)
+  useEffect(() => {
+    if (cached) return;
+    prefetchAllFarmerData().then((data) => {
+      setAllRows(data.measurements);
+      setProfileName(data.profile.full_name ?? "");
+    }).catch(() => {});
+  }, []);
+
+  // Client-side filtering — INSTAN, tidak perlu API call
+  const rows = useMemo(() => {
+    let filtered = allRows;
+
+    if (statusFilter && statusFilter !== "all") {
+      filtered = filtered.filter(m => m.quality_status === statusFilter);
     }
-    setLoading(false);
-  };
+    if (fromDate) {
+      const from = new Date(fromDate);
+      filtered = filtered.filter(m => new Date(m.created_at) >= from);
+    }
+    if (toDate) {
+      const to = new Date(toDate);
+      to.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(m => new Date(m.created_at) <= to);
+    }
 
+    return filtered;
+  }, [allRows, statusFilter, fromDate, toDate]);
+
+  // Reset page saat filter berubah
   useEffect(() => {
     setPage(1);
-    fetchRows();
-  }, [search, statusFilter, fromDate, toDate]);
+  }, [statusFilter, fromDate, toDate]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   const currentPage = Math.min(page, totalPages);
@@ -76,7 +77,7 @@ export default function FarmerMeasurements() {
       const token = localStorage.getItem("auth_token");
       if (!token) throw new Error("Belum login");
       const params = new URLSearchParams();
-      if (search) params.set("owner", search);
+      if (profileName) params.set("owner", profileName);
       if (statusFilter && statusFilter !== "all") params.set("quality_status", statusFilter);
       if (fromDate) params.set("from", fromDate);
       if (toDate) params.set("to", toDate);
@@ -110,24 +111,17 @@ export default function FarmerMeasurements() {
               <BarChart3 className="h-5 w-5 text-primary" />
               Data Pengukuran
             </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">Riwayat pengukuran latex milik Anda</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Riwayat pengukuran latex milik <span className="font-semibold text-foreground">{profileName || "Anda"}</span>
+            </p>
           </div>
           <Button variant="outline" size="sm" onClick={exportCsv} className="gap-1.5 text-xs self-start">
             <Download className="h-4 w-4" /> Export CSV
           </Button>
         </div>
 
-        {/* Filters */}
+        {/* Filters — no owner search needed since it's already filtered */}
         <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Cari pemilik..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-9 text-sm"
-            />
-          </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-[170px] h-9 text-sm">
               <SelectValue placeholder="Filter mutu" />
@@ -141,21 +135,17 @@ export default function FarmerMeasurements() {
               <SelectItem value="Indikasi Oplos Air">Oplos Air</SelectItem>
             </SelectContent>
           </Select>
-          <div className="flex gap-2">
-            <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="w-full sm:w-[140px] h-9 text-sm" />
-            <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="w-full sm:w-[140px] h-9 text-sm" />
+          <div className="flex gap-2 flex-1">
+            <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="w-full sm:w-[140px] h-9 text-sm" placeholder="Dari" />
+            <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="w-full sm:w-[140px] h-9 text-sm" placeholder="Sampai" />
           </div>
         </div>
 
-        {/* Data */}
+        {/* Data — TIDAK ADA loading spinner */}
         <div className="rounded-xl border bg-card overflow-hidden">
-          {loading ? (
-            <div className="p-8 text-center">
-              <div className="h-8 w-8 mx-auto rounded-full border-2 border-primary border-t-transparent animate-spin" />
-            </div>
-          ) : rows.length === 0 ? (
+          {rows.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
-              Tidak ada data ditemukan.
+              Tidak ada data pengukuran ditemukan untuk akun Anda.
             </div>
           ) : (
             <>
@@ -170,7 +160,6 @@ export default function FarmerMeasurements() {
                     className="p-3 space-y-1.5"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium truncate flex-1 mr-2">{m.owner_name}</span>
                       <StatusBadge status={m.quality_status} color={statusToColor(m.quality_status)} />
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-xs">
@@ -194,13 +183,12 @@ export default function FarmerMeasurements() {
                 ))}
               </div>
 
-              {/* Desktop Table */}
+              {/* Desktop Table — no "Pemilik" column since all data belongs to the farmer */}
               <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/30">
                       <th className="p-3 text-left font-medium text-muted-foreground">#</th>
-                      <th className="p-3 text-left font-medium text-muted-foreground">Pemilik</th>
                       <th className="p-3 text-left font-medium text-muted-foreground">pH</th>
                       <th className="p-3 text-left font-medium text-muted-foreground">TDS (ppm)</th>
                       <th className="p-3 text-left font-medium text-muted-foreground">Suhu</th>
@@ -212,7 +200,6 @@ export default function FarmerMeasurements() {
                     {paginatedRows.map((m, i) => (
                       <tr key={m.id} className="border-b border-border/30 hover:bg-muted/20 transition-colors">
                         <td className="p-3 text-muted-foreground">{(currentPage - 1) * PER_PAGE + i + 1}</td>
-                        <td className="p-3 font-medium">{m.owner_name}</td>
                         <td className="p-3 font-mono">{m.ph_value != null ? Number(m.ph_value).toFixed(2) : "—"}</td>
                         <td className="p-3 font-mono">{m.tds_value}</td>
                         <td className="p-3 font-mono">{Number(m.temperature).toFixed(1)}°C</td>

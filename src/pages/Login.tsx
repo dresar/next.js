@@ -7,6 +7,7 @@ import { Droplets, Eye, EyeOff, UserPlus, LogIn, Leaf, Shield } from "lucide-rea
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { prefetchMeasurements } from "@/hooks/use-measurements";
+import { prefetchAllFarmerData } from "@/hooks/use-farmer-cache";
 import { motion, AnimatePresence } from "framer-motion";
 
 const Login = () => {
@@ -36,19 +37,24 @@ const Login = () => {
     setLoading(true);
     try {
       await signIn(email, password);
-      prefetchMeasurements().catch(console.error);
-      // Get role from localStorage token or re-check
+      // Get role from localStorage token
       const token = localStorage.getItem("auth_token");
+      let role = "admin";
       if (token) {
         try {
           const payload = JSON.parse(atob(token.split(".")[1]));
-          redirectByRole(payload.role ?? "admin");
-        } catch {
-          navigate("/");
-        }
-      } else {
-        navigate("/");
+          role = payload.role ?? "admin";
+        } catch {}
       }
+
+      // Prefetch data sesuai role SEBELUM navigasi — halaman langsung tampil tanpa loading
+      if (role === "petani") {
+        await prefetchAllFarmerData();
+      } else {
+        prefetchMeasurements().catch(console.error);
+      }
+
+      redirectByRole(role);
     } catch (err) {
       const message = (err as { message?: string })?.message ?? "Gagal login";
       toast.error(message);
@@ -61,12 +67,14 @@ const Login = () => {
     try {
       if (type === "admin") {
         await demoLogin();
+        prefetchMeasurements().catch(console.error);
         navigate("/");
       } else {
         await demoLoginPetani();
+        // Prefetch SEMUA data petani sebelum navigasi — zero loading di farmer page
+        await prefetchAllFarmerData();
         navigate("/farmer");
       }
-      prefetchMeasurements().catch(console.error);
     } catch (err) {
       const message = (err as { message?: string })?.message ?? "Gagal quick login";
       toast.error(message);
